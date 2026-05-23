@@ -1,6 +1,6 @@
 {
-  "name": "survay-pwa",
-  "short_name": "survay-pwa",
+  "name": "Kora Survey",
+  "short_name": "Kora Survey",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",
