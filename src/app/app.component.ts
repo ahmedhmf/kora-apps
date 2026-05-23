@@ -295,6 +295,75 @@ export class AppComponent implements OnInit {
     return template ? template.fields : [];
   }
 
+  exportToCsv() {
+    const active = this.activeDashboardTemplate();
+    if (!active) return;
+
+    const subs = this.dashboardSubmissions();
+    if (subs.length === 0) {
+      this.showToast('No submissions to export.');
+      return;
+    }
+
+    // 1. Build CSV headers (including standard metadata and PII)
+    const headers = [
+      'Submission ID',
+      'Timestamp',
+      'Respondent Name',
+      'Respondent Email',
+      'Is Anonymous',
+      'Kiosk Identifier'
+    ];
+
+    // Append dynamic template field labels as headers
+    const fields = active.fields;
+    for (const f of fields) {
+      // Escape quotes in column headers
+      headers.push(`"${f.label.replace(/"/g, '""')}"`);
+    }
+
+    const csvRows = [headers.join(',')];
+
+    // 2. Map submissions data into CSV rows
+    for (const sub of subs) {
+      const row = [
+        `"${(sub.id || sub.uuid || '').toString().replace(/"/g, '""')}"`,
+        `"${(sub.timestamp || '').replace(/"/g, '""')}"`,
+        `"${(sub.respondent_name || '').replace(/"/g, '""')}"`,
+        `"${(sub.respondent_email || '').replace(/"/g, '""')}"`,
+        `"${sub.is_anonymous ? 'Yes' : 'No'}"`,
+        `"${(sub.client_identifier || '').replace(/"/g, '""')}"`
+      ];
+
+      // Map dynamic answers based on key matching
+      for (const f of fields) {
+        const answer = sub.answers[f.key] || '';
+        row.push(`"${answer.replace(/"/g, '""')}"`);
+      }
+
+      csvRows.push(row.join(','));
+    }
+
+    // 3. Assemble blob and trigger client-side download
+    // FEFF is the UTF-8 Byte Order Mark (BOM) which prevents Excel from corrupting non-ASCII symbols
+    const csvContent = '\uFEFF' + csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    const cleanFilename = active.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `kora_export_${cleanFilename}_${Date.now()}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    this.showToast('CSV report downloaded!');
+  }
+
   async confirmClearHistory() {
     if (confirm('Are you sure you want to permanently delete all local results from this iPad? This cannot be undone.')) {
       await this.store.clearAllHistory();

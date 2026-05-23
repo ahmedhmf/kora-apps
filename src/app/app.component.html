@@ -343,14 +343,24 @@
               <p class="dashboard-survey-desc">{{ active.description }}</p>
             </div>
 
-            <button 
-              type="button" 
-              class="btn-clear-history-all" 
-              (click)="clearTemplateHistory(active.id)"
-              title="Wipe local records for this survey"
-            >
-              🗑️ Wipe Survey Data
-            </button>
+            <div class="dashboard-header-actions">
+              <button 
+                type="button" 
+                class="btn-export-csv" 
+                (click)="exportToCsv()"
+                title="Download CSV spreadsheet"
+              >
+                📥 Export CSV
+              </button>
+              <button 
+                type="button" 
+                class="btn-clear-history-all" 
+                (click)="clearTemplateHistory(active.id)"
+                title="Wipe local records for this survey"
+              >
+                🗑️ Wipe Survey Data
+              </button>
+            </div>
           </div>
 
           <!-- Dashboard Analytics Grid -->
