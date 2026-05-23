@@ -1763,57 +1763,83 @@ $aura-text-dark: #4a4a52;
 }
 
 // --------------------------------------------------------------------------
-// Admin Login Modal
+// Full-Screen Dedicated Admin Login Page
 // --------------------------------------------------------------------------
-.admin-modal-backdrop {
+.admin-login-fullscreen-portal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: radial-gradient(circle at 50% 50%, #0c0c12 0%, #020204 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 9999;
-  animation: aura-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 10000;
+  overflow: hidden;
+  padding: 1.5rem;
+
+  // Background glow elements
+  .login-glow-orb-1 {
+    position: absolute;
+    top: 20%;
+    left: 20%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+    filter: blur(50px);
+  }
+
+  .login-glow-orb-2 {
+    position: absolute;
+    bottom: 20%;
+    right: 20%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
+    pointer-events: none;
+    filter: blur(50px);
+  }
 }
 
-.admin-modal-card {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 24px;
-  padding: 2.5rem;
+.admin-login-card {
+  background: rgba(10, 10, 15, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
+  padding: 3rem 2.5rem;
   width: 100%;
-  max-width: 420px;
-  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  max-width: 440px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.8), 0 0 100px rgba(255, 255, 255, 0.02) inset;
+  z-index: 10;
 
   .modal-header {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 2.25rem;
 
-    .modal-brand-logo {
-      height: 24px;
+    .welcome-brand-area {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .login-brand-logo {
+      height: 32px;
       width: auto;
       object-fit: contain;
-      margin-bottom: 1.25rem;
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
-      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.2));
+      filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
     }
 
     .modal-title {
-      font-size: 1.5rem;
+      font-size: 1.65rem;
       font-weight: 700;
-      color: $aura-white;
+      color: #ffffff;
       margin: 0 0 0.5rem 0;
-      font-family: 'Orbitron', sans-serif;
-      letter-spacing: 0.04em;
+      letter-spacing: -0.02em;
     }
 
     .modal-subtitle {
-      font-size: 0.875rem;
-      color: $aura-text-muted;
+      font-size: 0.85rem;
+      color: #8a8a93;
       margin: 0;
       line-height: 1.5;
     }
@@ -1822,99 +1848,77 @@ $aura-text-dark: #4a4a52;
   .modal-body {
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    margin-bottom: 1.75rem;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 
     .login-error-banner {
       background: rgba(247, 118, 142, 0.08);
       border: 1px solid rgba(247, 118, 142, 0.25);
       color: #f7768e;
       font-size: 0.85rem;
-      padding: 0.75rem 1rem;
-      border-radius: 10px;
+      padding: 0.8rem 1rem;
+      border-radius: 12px;
       font-weight: 600;
+      text-align: center;
+      animation: shake 0.3s ease;
     }
 
     .modal-field {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
+      gap: 0.55rem;
 
       .modal-label {
-        font-size: 0.8rem;
+        font-size: 0.775rem;
         font-weight: 700;
-        color: rgba(255, 255, 255, 0.6);
+        color: rgba(255, 255, 255, 0.45);
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
       }
 
       .modal-input {
         font-family: inherit;
-        font-size: 1rem;
-        color: $aura-white;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 10px;
-        padding: 0.85rem 1rem;
+        font-size: 1.05rem;
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 0.95rem 1.25rem;
         width: 100%;
-        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        outline: none;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
         &::placeholder {
-          color: rgba(255, 255, 255, 0.25);
+          color: #4a4a52;
         }
 
         &:focus {
-          border-color: rgba(255, 255, 255, 0.5);
-          box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
-          outline: none;
+          border-color: #ffffff;
+          box-shadow: 0 0 20px rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.04);
         }
       }
     }
   }
 
   .modal-actions {
-    display: flex;
-    gap: 0.85rem;
-
-    .btn-modal-cancel {
-      flex: 1;
-      font-family: inherit;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: rgba(255, 255, 255, 0.5);
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 0.85rem;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-
-      &:hover:not(:disabled) {
-        color: $aura-white;
-        background: rgba(255, 255, 255, 0.08);
-      }
-
-      &:disabled { opacity: 0.4; cursor: not-allowed; }
-    }
-
     .btn-modal-login {
-      flex: 2;
+      width: 100%;
       font-family: inherit;
-      font-size: 0.9rem;
+      font-size: 1.05rem;
       font-weight: 700;
       color: #000000;
       background: #ffffff;
       border: none;
-      padding: 0.85rem;
-      border-radius: 10px;
+      padding: 1rem;
+      border-radius: 12px;
       cursor: pointer;
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 4px 16px rgba(255, 255, 255, 0.2);
-      letter-spacing: 0.02em;
+      box-shadow: 0 8px 24px rgba(255, 255, 255, 0.2);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
       &:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(255, 255, 255, 0.35);
+        box-shadow: 0 12px 32px rgba(255, 255, 255, 0.4);
       }
 
       &:active:not(:disabled) {
@@ -1922,10 +1926,121 @@ $aura-text-dark: #4a4a52;
       }
 
       &:disabled {
-        opacity: 0.5;
+        opacity: 0.3;
         cursor: not-allowed;
         transform: none;
+        box-shadow: none;
       }
     }
   }
+}
+
+// --------------------------------------------------------------------------
+// Share Link Button in Admin Cards
+// --------------------------------------------------------------------------
+.btn-share-link {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.725rem;
+  font-weight: 700;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// --------------------------------------------------------------------------
+// Glassmorphic Custom Toast Notification
+// --------------------------------------------------------------------------
+.premium-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: rgba(10, 10, 15, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  z-index: 100000;
+  pointer-events: none;
+
+  .toast-icon {
+    font-size: 1.15rem;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.4));
+  }
+
+  .toast-text {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.02em;
+  }
+}
+
+.animate-toast {
+  animation: toast-slide-in-out 3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes toast-slide-in-out {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  10%, 90% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+}
+
+// Remove padding adjustments when headers are hidden in direct links
+.app-workspace-luxury.no-header {
+  padding-top: 2rem;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Keyframes
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-zoom {
+  animation: zoomIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

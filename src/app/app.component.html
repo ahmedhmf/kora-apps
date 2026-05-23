@@ -1,5 +1,73 @@
-<!-- Persistent Unified Branded Luxury Header -->
-<header class="aura-master-header">
+@if (!isAdminAuthenticated() && !isDirectShareLink()) {
+  <!-- Premium Full-Screen Dedicated Admin Login Page -->
+  <div class="admin-login-fullscreen-portal">
+    <div class="login-glow-orb-1"></div>
+    <div class="login-glow-orb-2"></div>
+    
+    <div class="admin-login-card animate-zoom">
+      <div class="modal-header">
+        <div class="welcome-brand-area">
+          <img src="assets/logo.png" alt="KORA" class="login-brand-logo" />
+        </div>
+        <h2 class="modal-title">Kora Survey Hub</h2>
+        <p class="modal-subtitle">Authorized administrator portal access</p>
+      </div>
+
+      <div class="modal-body">
+        @if (loginError()) {
+          <div class="login-error-banner">⚠ {{ loginError() }}</div>
+        }
+
+        <div class="modal-field">
+          <label class="modal-label" for="admin-username">Username</label>
+          <input
+            id="admin-username"
+            type="text"
+            class="modal-input"
+            placeholder="Enter admin username"
+            [value]="loginUsername()"
+            (input)="loginUsername.set($any($event.target).value)"
+            (keydown.enter)="submitLogin()"
+            autocomplete="username"
+            autofocus
+          />
+        </div>
+
+        <div class="modal-field">
+          <label class="modal-label" for="admin-password">Password</label>
+          <input
+            id="admin-password"
+            type="password"
+            class="modal-input"
+            placeholder="Enter secure password"
+            [value]="loginPassword()"
+            (input)="loginPassword.set($any($event.target).value)"
+            (keydown.enter)="submitLogin()"
+            autocomplete="current-password"
+          />
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          class="btn-modal-login full-width-login"
+          (click)="submitLogin()"
+          [disabled]="loginLoading()"
+        >
+          @if (loginLoading()) {
+            Authenticating Console...
+          } @else {
+            Secure Log In →
+          }
+        </button>
+      </div>
+    </div>
+  </div>
+} @else {
+  @if (isAdminAuthenticated()) {
+    <!-- Persistent Unified Branded Luxury Header -->
+    <header class="aura-master-header">
   <div class="header-brand" (click)="currentTab.set('home'); exitFullscreen()">
     <img src="assets/logo.png" alt="KORA" class="header-brand-logo" />
   </div>
@@ -46,8 +114,8 @@
     }
   </div>
 </header>
-
-<main class="app-workspace-luxury">
+}
+<main class="app-workspace-luxury" [class.no-header]="!isAdminAuthenticated()">
   
   <!-- HOME VIEW -->
   @if (currentTab() === 'home') {
@@ -111,6 +179,14 @@
               <span class="card-luxury-fields-metric">✧ {{ template.fields.length }} dynamic questions</span>
               
               <div class="card-action-bar">
+                <button 
+                  type="button" 
+                  class="btn-share-link" 
+                  (click)="$event.stopPropagation(); copyShareLink(template.id)"
+                  title="Copy Shareable Survey Link"
+                >
+                  🔗 Share
+                </button>
                 @if (template.id.startsWith('custom_')) {
                   <button 
                     type="button" 
@@ -146,7 +222,7 @@
   <!-- SURVEY WIZARD KIOSK VIEW -->
   @if (currentTab() === 'survey-wizard') {
     <section class="wizard-runner-view animate-fade">
-      <app-generic-survey-form (finished)="currentTab.set('home'); exitFullscreen()"></app-generic-survey-form>
+      <app-generic-survey-form [isDirectShareLink]="isDirectShareLink()" (finished)="currentTab.set('home'); exitFullscreen()"></app-generic-survey-form>
     </section>
   }
 
@@ -604,73 +680,12 @@
   }
 
 </main>
+}
 
-<!-- ─── Admin Login Modal ──────────────────────────────────────────────────── -->
-@if (showLoginModal()) {
-  <div class="admin-modal-backdrop" (click)="cancelLogin()">
-    <div class="admin-modal-card" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <img src="assets/logo.png" alt="KORA" class="modal-brand-logo" />
-        <h2 class="modal-title">Admin Access</h2>
-        <p class="modal-subtitle">Enter your credentials to access the admin panel.</p>
-      </div>
-
-      <div class="modal-body">
-        @if (loginError()) {
-          <div class="login-error-banner">⚠ {{ loginError() }}</div>
-        }
-
-        <div class="modal-field">
-          <label class="modal-label" for="admin-username">Username</label>
-          <input
-            id="admin-username"
-            type="text"
-            class="modal-input"
-            placeholder="Enter username"
-            [value]="loginUsername()"
-            (input)="loginUsername.set($any($event.target).value)"
-            (keydown.enter)="submitLogin()"
-            autocomplete="username"
-          />
-        </div>
-
-        <div class="modal-field">
-          <label class="modal-label" for="admin-password">Password</label>
-          <input
-            id="admin-password"
-            type="password"
-            class="modal-input"
-            placeholder="Enter password"
-            [value]="loginPassword()"
-            (input)="loginPassword.set($any($event.target).value)"
-            (keydown.enter)="submitLogin()"
-            autocomplete="current-password"
-          />
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button
-          type="button"
-          class="btn-modal-cancel"
-          (click)="cancelLogin()"
-          [disabled]="loginLoading()"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          class="btn-modal-login"
-          (click)="submitLogin()"
-          [disabled]="loginLoading()"
-        >
-          @if (loginLoading()) {
-            Logging in...
-          } @else {
-            Login →
-          }
-        </button>
-      </div>
-    </div>
+<!-- Premium Custom Glassmorphic Toast Notification -->
+@if (toastMessage()) {
+  <div class="premium-toast animate-toast">
+    <span class="toast-icon">🔗</span>
+    <span class="toast-text">{{ toastMessage() }}</span>
   </div>
 }

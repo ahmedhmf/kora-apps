@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, effect, Output, EventEmitter } from '@angular/core';
+import { Component, inject, signal, computed, effect, Input, Output, EventEmitter } from '@angular/core';
 import { SurveySyncStore } from '../../store/survey-sync.store';
 
 @Component({
@@ -26,14 +26,16 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
             }
           </div>
 
-          <button 
-            type="button" 
-            class="btn-exit-survey-kiosk" 
-            (click)="exitSurveyDirectly()"
-            title="Exit Survey"
-          >
-            ✕ Exit
-          </button>
+          @if (!isDirectShareLink) {
+            <button 
+              type="button" 
+              class="btn-exit-survey-kiosk" 
+              (click)="exitSurveyDirectly()"
+              title="Exit Survey"
+            >
+              ✕ Exit
+            </button>
+          }
         </div>
 
         <div class="wizard-slide-canvas">
@@ -278,15 +280,17 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
                   class="btn-luxury-secondary"
                   (click)="restartSurvey()"
                 >
-                  New Survey
+                  {{ isDirectShareLink ? 'Submit Another Response' : 'New Survey' }}
                 </button>
-                <button 
-                  type="button" 
-                  class="btn-luxury-primary"
-                  (click)="finishSurvey()"
-                >
-                  Finish
-                </button>
+                @if (!isDirectShareLink) {
+                  <button 
+                    type="button" 
+                    class="btn-luxury-primary"
+                    (click)="finishSurvey()"
+                  >
+                    Finish
+                  </button>
+                }
               </div>
             </div>
           }
@@ -953,6 +957,8 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
 })
 export class GenericSurveyFormComponent {
   readonly store = inject(SurveySyncStore);
+
+  @Input() isDirectShareLink = false;
 
   @Output() readonly finished = new EventEmitter<void>();
 

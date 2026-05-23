@@ -20,6 +20,10 @@ export class AppComponent implements OnInit {
   readonly activeDashboardTemplate = signal<SurveyTemplate | null>(null);
   readonly resultsSearchQuery = signal<string>('');
 
+  // ─── Direct Share & Toast Notification Signals ────────────────────────────
+  readonly isDirectShareLink = signal<boolean>(false);
+  readonly toastMessage = signal<string>('');
+
   // ─── Admin Login Modal State ─────────────────────────────────────────────
   readonly showLoginModal = signal<boolean>(false);
   readonly loginUsername = signal<string>('');
@@ -113,14 +117,49 @@ export class AppComponent implements OnInit {
 
   readonly isFullscreen = signal<boolean>(false);
 
-  ngOnInit() {
-    this.store.initStore(this.mockTemplates);
+  showToast(message: string) {
+    this.toastMessage.set(message);
+    setTimeout(() => {
+      this.toastMessage.set('');
+    }, 3000);
+  }
+
+  copyShareLink(templateId: string) {
+    const shareUrl = `${window.location.origin}/?survey=${templateId}`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      this.showToast('Shareable survey link copied!');
+    }).catch(err => {
+      console.error('[AUTH] Failed to copy link:', err);
+      this.showToast('Failed to copy share link.');
+    });
+  }
+
+  async ngOnInit() {
+    // 1. Seed and load all active templates from server/local
+    await this.store.initStore(this.mockTemplates);
     this.setupFullscreenListener();
-    // Restore admin session from sessionStorage if token is still valid
+
+    // 2. Restore admin session from sessionStorage if token is still valid
     const isAuthed = this.api.isAuthenticated();
     this.isAdminAuthenticated.set(isAuthed);
     if (isAuthed) {
       this.store.loadSubmissionsFromCloud();
+    }
+
+    // 3. Check for Direct Share Link (?survey=template_id)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const surveyId = params.get('survey');
+      if (surveyId) {
+        const template = this.store.templates().find(t => t.id === surveyId);
+        if (template) {
+          this.isDirectShareLink.set(true);
+          this.store.selectTemplate(template);
+          this.currentTab.set('survey-wizard');
+        } else {
+          console.warn(`[AUTH] Direct share survey template "${surveyId}" not found in current schema.`);
+        }
+      }
     }
   }
 
