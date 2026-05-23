@@ -195,6 +195,21 @@ export const SurveySyncStore = signalStore(
 
       syncPendingSubmissions,
 
+      async loadSubmissionsFromCloud() {
+        if (!store.isOnline() || !apiService.isAuthenticated()) return;
+        try {
+          const cloud = await firstValueFrom(apiService.getSubmissions());
+          const pending = await dbService.getAllSubmissions();
+          const combined = [
+            ...pending.map(p => ({ ...p, status: 'Offline Cached' })),
+            ...cloud.map(c => ({ ...c, status: 'Synced (Direct)' }))
+          ];
+          patchState(store, { history: combined });
+        } catch (error) {
+          console.error('[STORE] Failed to load cloud submissions:', error);
+        }
+      },
+
       async saveGenericSubmission(payload: Omit<GenericSubmission, 'id'>) {
         const isOnline = store.isOnline();
         const uuid = typeof crypto !== 'undefined' && crypto.randomUUID

@@ -117,7 +117,11 @@ export class AppComponent implements OnInit {
     this.store.initStore(this.mockTemplates);
     this.setupFullscreenListener();
     // Restore admin session from sessionStorage if token is still valid
-    this.isAdminAuthenticated.set(this.api.isAuthenticated());
+    const isAuthed = this.api.isAuthenticated();
+    this.isAdminAuthenticated.set(isAuthed);
+    if (isAuthed) {
+      this.store.loadSubmissionsFromCloud();
+    }
   }
 
   selectTemplateAndFullscreen(template: SurveyTemplate) {
@@ -130,6 +134,9 @@ export class AppComponent implements OnInit {
   navigateToAdmin(tab: 'creator' | 'results') {
     if (this.isAdminAuthenticated()) {
       this.currentTab.set(tab);
+      if (tab === 'results') {
+        this.store.loadSubmissionsFromCloud();
+      }
     } else {
       this.pendingAdminTab = tab;
       this.loginError.set('');
@@ -157,6 +164,9 @@ export class AppComponent implements OnInit {
       this.showLoginModal.set(false);
       if (this.pendingAdminTab) {
         this.currentTab.set(this.pendingAdminTab);
+        if (this.pendingAdminTab === 'results') {
+          this.store.loadSubmissionsFromCloud();
+        }
         this.pendingAdminTab = null;
       }
     } catch (err: any) {
