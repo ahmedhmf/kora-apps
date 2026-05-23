@@ -55,13 +55,6 @@ interface FieldCreatorItem {
         <div class="questions-section">
           <div class="section-header-inline">
             <h3 class="section-subtitle">Survey Question Fields</h3>
-            <button 
-              type="button" 
-              class="btn btn-add" 
-              (click)="addField()"
-            >
-              ＋ Add Custom Question
-            </button>
           </div>
 
           <div class="fields-builder-list">
@@ -166,9 +159,19 @@ interface FieldCreatorItem {
               </div>
             } @empty {
               <div class="fields-empty-state">
-                <span>No questions added yet. Click "Add Custom Question" above to begin building the template.</span>
+                <span>No questions added yet. Click "Add New Question" below to begin building your survey.</span>
               </div>
             }
+          </div>
+
+          <div class="builder-actions-row">
+            <button 
+              type="button" 
+              class="btn-add-bottom" 
+              (click)="addField()"
+            >
+              ＋ Add New Question Field
+            </button>
           </div>
         </div>
 
@@ -467,19 +470,43 @@ interface FieldCreatorItem {
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .btn-add {
-      background: rgba(255, 255, 255, 0.05);
+    .builder-actions-row {
+      display: flex;
+      justify-content: center;
+      margin-top: 1.75rem;
+      margin-bottom: 0.5rem;
+      width: 100%;
+    }
+
+    .btn-add-bottom {
+      width: 100%;
+      max-width: 480px;
+      background: rgba(255, 255, 255, 0.03);
       color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      padding: 0.65rem 1.35rem;
-      font-size: 0.85rem;
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      padding: 1.1rem 2rem;
+      font-size: 0.95rem;
       font-weight: 700;
-      border-radius: 10px;
+      border-radius: 14px;
+      font-family: inherit;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
 
       &:hover {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.45);
-        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.4);
+        border-style: solid;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(255, 255, 255, 0.08);
+      }
+
+      &:active {
+        transform: translateY(0);
       }
     }
 

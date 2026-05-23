@@ -44,7 +44,7 @@ $aura-text-dark: #4a4a52;
   margin: 0 auto;
   padding: 2.5rem 1.5rem;
   box-sizing: border-box;
-  background-color: $aura-black-bg;
+  background-color: transparent; /* Translucent workspace to show page background texture */
   min-height: calc(100vh - 72px);
 }
 
@@ -53,8 +53,8 @@ $aura-text-dark: #4a4a52;
 // --------------------------------------------------------------------------
 .aura-master-header {
   height: 72px;
-  background: $aura-black-bg;
-  border-bottom: 1px solid $aura-border-gold;
+  background: rgba(0, 0, 0, 0.65); /* Translucent master header */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -77,19 +77,21 @@ $aura-text-dark: #4a4a52;
       transform: scale(1.02);
     }
 
-    .brand-symbol {
-      font-size: 1.5rem;
-      color: $aura-gold;
-      text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+    .header-brand-logo {
+      height: 18px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.15));
     }
 
     .brand-name {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: $aura-white;
-      letter-spacing: 0.25em;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.45);
+      letter-spacing: 0.3em;
       text-transform: uppercase;
       font-family: 'Orbitron', sans-serif;
+      margin-left: 0.15rem;
     }
   }
 
@@ -196,17 +198,30 @@ $aura-text-dark: #4a4a52;
     flex-direction: column;
     gap: 1.25rem;
 
-    .hero-title-premium {
-      font-size: 2.8rem;
-      font-weight: 700;
-      color: $aura-white;
-      letter-spacing: -0.02em;
-      margin: 0;
-      font-family: 'Orbitron', sans-serif;
+    .hero-logo-container {
+      display: flex;
+      align-items: baseline;
+      gap: 1.25rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
 
-      background: linear-gradient(135deg, $aura-white 40%, $aura-gold-light 90%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .hero-logo-premium {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.25));
+    }
+
+    .hero-logo-subtitle {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2rem;
+      font-weight: 300;
+      color: rgba(255, 255, 255, 0.3);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      position: relative;
+      top: -4px;
     }
 
     .hero-desc-premium {
@@ -1776,10 +1791,15 @@ $aura-text-dark: #4a4a52;
     text-align: center;
     margin-bottom: 2rem;
 
-    .modal-icon {
-      font-size: 2.5rem;
+    .modal-brand-logo {
+      height: 24px;
+      width: auto;
+      object-fit: contain;
+      margin-bottom: 1.25rem;
       display: block;
-      margin-bottom: 1rem;
+      margin-left: auto;
+      margin-right: auto;
+      filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.2));
     }
 
     .modal-title {

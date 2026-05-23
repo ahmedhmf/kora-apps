@@ -1,8 +1,7 @@
 <!-- Persistent Unified Branded Luxury Header -->
 <header class="aura-master-header">
   <div class="header-brand" (click)="currentTab.set('home'); exitFullscreen()">
-    <span class="brand-symbol">▲</span>
-    <span class="brand-name">KORA ACADEMIES</span>
+    <img src="assets/logo.png" alt="KORA" class="header-brand-logo" />
   </div>
 
   <div class="header-network-controls">
@@ -54,9 +53,6 @@
   @if (currentTab() === 'home') {
     <section class="home-panel-canvas animate-fade">
       <div class="home-hero-header">
-        <h1 class="hero-title-premium">▲ KORA ACADEMIES</h1>
-        <p class="hero-desc-premium">Capture client field insights offline with our high-fidelity dynamic kiosk engine. Data is securely queued in the local IndexedDB database and synced immediately upon reconnecting.</p>
-        
         <div class="home-quick-actions">
           <button 
             type="button" 
@@ -614,7 +610,7 @@
   <div class="admin-modal-backdrop" (click)="cancelLogin()">
     <div class="admin-modal-card" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <span class="modal-icon">🔐</span>
+        <img src="assets/logo.png" alt="KORA" class="modal-brand-logo" />
         <h2 class="modal-title">Admin Access</h2>
         <p class="modal-subtitle">Enter your credentials to access the admin panel.</p>
       </div>

@@ -17,12 +17,23 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
           
           <div class="progress-fill-line" [style.width.%]="progressPercent"></div>
           <div class="step-indicator-text">
-            @if (currentStep() < template.fields.length) {
+            @if (showWelcome()) {
+              Introduction
+            } @else if (currentStep() < template.fields.length) {
               Question {{ currentStep() + 1 }} of {{ template.fields.length }}
             } @else {
               Evaluation Completed
             }
           </div>
+
+          <button 
+            type="button" 
+            class="btn-exit-survey-kiosk" 
+            (click)="exitSurveyDirectly()"
+            title="Exit Survey"
+          >
+            ✕ Exit
+          </button>
         </div>
 
         <div class="wizard-slide-canvas">
@@ -30,6 +41,9 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
       <!-- Welcome Step: name, email, anonymous checkbox -->
           @if (showWelcome()) {
             <div class="wizard-slide welcome-slide">
+              <div class="welcome-brand-area">
+                <img src="assets/logo.png" alt="KORA" class="welcome-brand-logo" />
+              </div>
               <div class="question-meta-badge">Before we begin</div>
               <h2 class="slide-question-label">Who is filling in this survey?</h2>
 
@@ -156,16 +170,28 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
                 }
 
                 @if (field.type === 'star') {
-                  <div class="star-rating-luxury" [id]="field.key">
+                  <div 
+                    class="star-rating-luxury" 
+                    [id]="field.key"
+                    (mouseleave)="hoveredRating.set(0)"
+                  >
                     @for (star of [1, 2, 3, 4, 5]; track star) {
                       <button
                         type="button"
                         class="star-btn-luxury"
-                        [class.active]="+(answers()[field.key] || 0) >= star"
+                        [class.active]="hoveredRating() > 0 ? (hoveredRating() >= star) : (+(answers()[field.key] || 0) >= star)"
+                        (mouseenter)="hoveredRating.set(star)"
                         (click)="updateAnswer(field.key, star.toString())"
-                        [title]="star + ' Stars'"
+                        [title]="star + ' Rating'"
                       >
-                        ★
+                        <svg viewBox="0 0 15 14" xmlns="http://www.w3.org/2000/svg" class="rating-svg-icon">
+                          <path d="M2.31135 13.8947L1.26849 12.0602L1.96373 10.8393C2.0979 10.6038 2.34794 10.4551 2.62238 10.4551H8.63556L9.68451 12.2957H3.65913C3.39079 12.2957 3.14075 12.4445 3.00049 12.68L2.31135 13.8947Z"/>
+                          <path d="M1.04285 11.6635L0 9.82291L0.695237 8.60201C0.829405 8.36651 1.07945 8.21777 1.35388 8.21777H6.56206C7.06214 8.21777 7.51953 8.49046 7.76957 8.93048L8.40992 10.0584H2.39064C2.1223 10.0584 1.87226 10.2071 1.73199 10.4488L1.04285 11.6635Z"/>
+                          <path d="M3.78111 0H5.86682L6.56206 1.22089C6.69622 1.4564 6.69622 1.75387 6.56206 1.98938L3.55546 7.28198H1.46365L4.47025 1.98938C4.60441 1.75387 4.60441 1.4564 4.47025 1.22089L3.78111 0Z"/>
+                          <path d="M6.31203 0H8.39774L9.09297 1.22089C9.22714 1.4564 9.22714 1.75387 9.09297 1.98938L6.48889 6.56928C6.23885 7.0093 5.77535 7.28198 5.28137 7.28198H4.00067L7.00117 1.98938C7.13533 1.75387 7.13533 1.4564 7.00117 1.22089L6.31203 0Z"/>
+                          <path d="M14.8927 8.22403L13.8498 10.0585H12.4655C12.1971 10.0585 11.9471 9.90973 11.8068 9.67423L8.80023 4.38162L9.84309 2.53479L12.8497 7.83359C12.9838 8.0691 13.2339 8.21784 13.5083 8.21784H14.8866L14.8927 8.22403Z"/>
+                          <path d="M13.6303 10.4488L12.5874 12.2895H11.2031C10.9347 12.2895 10.6847 12.1407 10.5444 11.9052L7.94034 7.32534C7.6903 6.88532 7.6903 6.34615 7.94034 5.90613L8.58069 4.7782L11.5873 10.0708C11.7214 10.3063 11.9715 10.455 12.2459 10.455H13.6303V10.4488Z"/>
+                        </svg>
                       </button>
                     }
                     @if (answers()[field.key]) {
@@ -311,13 +337,47 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
 
     .step-indicator-text {
       position: absolute;
-      top: 12px;
-      right: 20px;
+      top: 18px;
+      left: 24px;
       font-size: 0.775rem;
       font-weight: 700;
-      color: #ffffff;
+      color: rgba(255, 255, 255, 0.45);
       text-transform: uppercase;
       letter-spacing: 0.08em;
+    }
+
+    .btn-exit-survey-kiosk {
+      position: absolute;
+      top: 10px;
+      right: 24px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 99px;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.725rem;
+      font-weight: 700;
+      padding: 0.35rem 0.85rem;
+      cursor: pointer;
+      font-family: inherit;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      z-index: 10;
+
+      &:hover {
+        background: rgba(255, 0, 0, 0.08);
+        border-color: rgba(255, 0, 0, 0.3);
+        color: #ff0000;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(255, 0, 0, 0.15);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
     }
 
     .wizard-slide-canvas {
@@ -567,22 +627,48 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
     .star-btn-luxury {
       background: transparent;
       border: none;
-      font-size: 3rem;
-      color: #1e1e24;
       cursor: pointer;
-      padding: 0;
+      padding: 0.25rem;
       line-height: 1;
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .rating-svg-icon {
+        width: 3.25rem;
+        height: 3rem;
+        fill: none;
+        opacity: 0.35;
+        transition: transform 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+
+        path {
+          fill: #ffffff;
+          transition: fill 0.2s ease;
+        }
+      }
 
       &:hover {
         transform: scale(1.2);
-        color: #ffffff;
+        
+        .rating-svg-icon {
+          opacity: 1;
+          filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.45));
+          path {
+            fill: #FF0000;
+          }
+        }
       }
 
       &.active {
-        color: #ffffff;
-        text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+        .rating-svg-icon {
+          opacity: 1;
+          filter: drop-shadow(0 0 12px rgba(255, 0, 0, 0.65));
+          path {
+            fill: #FF0000;
+          }
+        }
       }
     }
 
@@ -769,6 +855,19 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
     .welcome-slide {
       max-width: 560px;
       margin: 0 auto;
+
+      .welcome-brand-area {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 2rem;
+      }
+
+      .welcome-brand-logo {
+        height: 28px;
+        width: auto;
+        object-fit: contain;
+        filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.2));
+      }
     }
 
     .welcome-form-zone {
@@ -864,6 +963,7 @@ export class GenericSurveyFormComponent {
   readonly isAnonymous = signal<boolean>(false);
 
   readonly clientIdentifier = signal<string>('');
+  readonly hoveredRating = signal<number>(0);
   readonly answers = signal<{ [key: string]: string }>({});
 
   // Wizard runner state:
@@ -976,6 +1076,11 @@ export class GenericSurveyFormComponent {
   }
 
   finishSurvey() {
+    this.resetForm();
+    this.finished.emit();
+  }
+
+  exitSurveyDirectly() {
     this.resetForm();
     this.finished.emit();
   }
