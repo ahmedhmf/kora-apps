@@ -180,6 +180,45 @@ $aura-text-dark: #4a4a52;
         cursor: not-allowed;
       }
     }
+
+    .auto-sync-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 99px;
+      border: 1px solid rgba(115, 218, 202, 0.3);
+      background: rgba(115, 218, 202, 0.06);
+      animation: auto-sync-fade-in 0.35s ease both;
+    }
+
+    .auto-sync-spinner {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid rgba(115, 218, 202, 0.2);
+      border-top-color: #73daca;
+      animation: spin-sync 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+
+    .auto-sync-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #73daca;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    @keyframes auto-sync-fade-in {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    @keyframes spin-sync {
+      to { transform: rotate(360deg); }
+    }
   }
 }
 

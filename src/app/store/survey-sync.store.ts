@@ -85,8 +85,23 @@ export const SurveySyncStore = signalStore(
     return {
       async initStore(seedTemplates: SurveyTemplate[]) {
         if (typeof window !== 'undefined') {
-          window.addEventListener('online', () => patchState(store, { isOnline: true }));
-          window.addEventListener('offline', () => patchState(store, { isOnline: false }));
+          // Track reconnection and auto-sync pending offline submissions
+          let reconnectDebounce: ReturnType<typeof setTimeout> | null = null;
+
+          window.addEventListener('online', () => {
+            patchState(store, { isOnline: true });
+            // Debounce: wait 1.5 s for connection to stabilise before syncing
+            if (reconnectDebounce) clearTimeout(reconnectDebounce);
+            reconnectDebounce = setTimeout(() => {
+              syncPendingSubmissions();
+            }, 1500);
+          });
+
+          window.addEventListener('offline', () => {
+            if (reconnectDebounce) clearTimeout(reconnectDebounce);
+            patchState(store, { isOnline: false });
+          });
+
           patchState(store, { isOnline: navigator.onLine });
         }
 

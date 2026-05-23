@@ -112,6 +112,13 @@
         </button>
       }
     }
+    <!-- Live auto-sync activity indicator (visible only while background sync is running) -->
+    @if (store.syncing()) {
+      <div class="auto-sync-indicator" title="Synchronizing offline responses with cloud...">
+        <span class="auto-sync-spinner"></span>
+        <span class="auto-sync-label">Auto-syncing…</span>
+      </div>
+    }
   </div>
 </header>
 }
@@ -705,7 +712,7 @@
 <!-- Premium Custom Glassmorphic Toast Notification -->
 @if (toastMessage()) {
   <div class="premium-toast animate-toast">
-    <span class="toast-icon">🔗</span>
+    <span class="toast-icon">{{ toastIcon() }}</span>
     <span class="toast-text">{{ toastMessage() }}</span>
   </div>
 }

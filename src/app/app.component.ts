@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
 import { GenericSurveyFormComponent } from './components/generic-survey-form/generic-survey-form.component';
 import { SurveyCreatorComponent } from './components/survey-creator/survey-creator.component';
 import { SurveySyncStore } from './store/survey-sync.store';
@@ -12,7 +12,7 @@ import { SurveyTemplate } from './models/survey.model';
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   readonly store = inject(SurveySyncStore);
   readonly api = inject(ApiService);
   readonly currentTab = signal<'home' | 'survey-wizard' | 'creator' | 'results'>('home');
@@ -23,7 +23,12 @@ export class AppComponent implements OnInit {
   // ─── Direct Share & Toast Notification Signals ────────────────────────────
   readonly isDirectShareLink = signal<boolean>(false);
   readonly toastMessage = signal<string>('');
+  readonly toastIcon = signal<string>('🔗'); // default: link icon
   readonly editingTemplate = signal<SurveyTemplate | null>(null);
+
+  // Auto-sync: reference kept for ngOnDestroy cleanup
+  private readonly autoSyncOnlineHandler: () => void;
+  private autoSyncToastTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ─── Admin Login Modal State ─────────────────────────────────────────────
   readonly showLoginModal = signal<boolean>(false);
@@ -33,6 +38,19 @@ export class AppComponent implements OnInit {
   readonly loginLoading = signal<boolean>(false);
   readonly isAdminAuthenticated = signal<boolean>(false);
   private pendingAdminTab: 'creator' | 'results' | null = null;
+
+  constructor() {
+    // Build the online handler once so we can remove the exact same reference in ngOnDestroy
+    this.autoSyncOnlineHandler = () => {
+      if (this.autoSyncToastTimer) clearTimeout(this.autoSyncToastTimer);
+      // Match the 1.5 s debounce used in the store so the toast fires right after sync starts
+      this.autoSyncToastTimer = setTimeout(() => {
+        if (this.store.pendingSyncCount() > 0 || this.store.syncing()) {
+          this.showToast('✨ Local responses synchronized with cloud!', '✨');
+        }
+      }, 1600);
+    };
+  }
 
   readonly dashboardSubmissions = computed(() => {
     const active = this.activeDashboardTemplate();
@@ -118,11 +136,12 @@ export class AppComponent implements OnInit {
 
   readonly isFullscreen = signal<boolean>(false);
 
-  showToast(message: string) {
+  showToast(message: string, icon = '🔗') {
+    this.toastIcon.set(icon);
     this.toastMessage.set(message);
     setTimeout(() => {
       this.toastMessage.set('');
-    }, 3000);
+    }, 3500);
   }
 
   copyShareLink(templateId: string) {
@@ -147,7 +166,12 @@ export class AppComponent implements OnInit {
       this.store.loadSubmissionsFromCloud();
     }
 
-    // 3. Check for Direct Share Link (?survey=template_id)
+    // 3. Register the auto-sync toast listener (store handles actual sync)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', this.autoSyncOnlineHandler);
+    }
+
+    // 4. Check for Direct Share Link (?survey=template_id)
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const surveyId = params.get('survey');
@@ -162,6 +186,13 @@ export class AppComponent implements OnInit {
         }
       }
     }
+  }
+
+  ngOnDestroy() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.autoSyncOnlineHandler);
+    }
+    if (this.autoSyncToastTimer) clearTimeout(this.autoSyncToastTimer);
   }
 
   selectTemplateAndFullscreen(template: SurveyTemplate) {
