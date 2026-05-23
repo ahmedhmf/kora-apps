@@ -52,6 +52,42 @@ router.post('/', requireAdmin, async (req: AuthRequest, res: Response): Promise<
   }
 });
 
+// ─── PUT update existing template (ADMIN only) ───────────────────────────────
+router.put('/:id', requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { name, description, fields } = req.body;
+
+    if (!name || !fields) {
+      res.status(400).json({ error: '`name` and `fields` are required.' });
+      return;
+    }
+
+    if (!Array.isArray(fields)) {
+      res.status(400).json({ error: '`fields` must be an array.' });
+      return;
+    }
+
+    const result = await pool.query(
+      `UPDATE survey_templates
+         SET name = $1, description = $2, fields = $3, updated_at = NOW()
+       WHERE id = $4
+       RETURNING id`,
+      [name, description || '', JSON.stringify(fields), id]
+    );
+
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: 'Template not found.' });
+      return;
+    }
+
+    res.json({ message: 'Template updated successfully.', id });
+  } catch (err) {
+    console.error('[TEMPLATES] PUT error:', err);
+    res.status(500).json({ error: 'Failed to update template.' });
+  }
+});
+
 // ─── DELETE template (ADMIN only) ────────────────────────────────────────────
 router.delete('/:id', requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {

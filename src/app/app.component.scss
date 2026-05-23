@@ -492,6 +492,28 @@ $aura-text-dark: #4a4a52;
           }
         }
 
+        .btn-edit-card-luxury {
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.1rem;
+          color: #bb9af7;
+          background: rgba(187, 154, 247, 0.08);
+          border: 1px solid rgba(187, 154, 247, 0.25);
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+          &:hover {
+            background: linear-gradient(135deg, #bb9af7, #7aa2f7) !important;
+            color: #000000 !important;
+            border-color: #bb9af7 !important;
+            transform: scale(1.1) !important;
+          }
+        }
+
         .btn-launch-pill {
           width: 48px;
           height: 48px;

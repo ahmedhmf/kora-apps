@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, Output, EventEmitter } from '@angular/core';
+import { Component, inject, signal, computed, Output, Input, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { SurveySyncStore } from '../../store/survey-sync.store';
 import { SurveyTemplate, SurveyField, SurveyFieldType } from '../../models/survey.model';
 
@@ -14,10 +14,17 @@ interface FieldCreatorItem {
   standalone: true,
   imports: [],
   template: `
-    <div class="creator-canvas">
+    <div class="creator-canvas" [class.edit-mode]="!!editTemplate">
       <div class="creator-header">
-        <h2 class="creator-title">⚙️ Design Custom Survey Template</h2>
-        <p class="creator-desc">Create a completely custom survey layout on the fly. Fields are persisted locally offline so you can immediately begin evaluations during field visits.</p>
+        <div class="mode-badge-row">
+          @if (editTemplate) {
+            <span class="mode-badge edit-badge">✏️ Edit Mode</span>
+          } @else {
+            <span class="mode-badge create-badge">＋ Create Mode</span>
+          }
+        </div>
+        <h2 class="creator-title">{{ editTemplate ? '✏️ Edit Survey Template' : '⚙️ Design Custom Survey Template' }}</h2>
+        <p class="creator-desc">{{ editTemplate ? 'Modify the name, description, or question fields below. Your changes will be saved and synced immediately.' : 'Create a completely custom survey layout on the fly. Fields are persisted locally offline so you can immediately begin evaluations during field visits.' }}</p>
       </div>
 
       <form (submit)="$event.preventDefault(); saveTemplate()" class="creator-form">
@@ -189,9 +196,10 @@ interface FieldCreatorItem {
           <button 
             type="submit" 
             class="btn btn-primary" 
+            [class.btn-update]="!!editTemplate"
             [disabled]="!isValid()"
           >
-            Save & Publish Template
+            {{ editTemplate ? '💾 Save Changes' : 'Save & Publish Template' }}
           </button>
         </div>
       </form>
@@ -208,10 +216,44 @@ interface FieldCreatorItem {
       display: flex;
       flex-direction: column;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      &.edit-mode {
+        border-color: rgba(147, 115, 242, 0.25);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(147, 115, 242, 0.1);
+      }
     }
 
     .creator-header {
       margin-bottom: 2rem;
+    }
+
+    .mode-badge-row {
+      margin-bottom: 0.85rem;
+    }
+
+    .mode-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border-radius: 99px;
+      border: 1px solid;
+    }
+
+    .create-badge {
+      color: #73daca;
+      background: rgba(115, 218, 202, 0.06);
+      border-color: rgba(115, 218, 202, 0.25);
+    }
+
+    .edit-badge {
+      color: #bb9af7;
+      background: rgba(187, 154, 247, 0.06);
+      border-color: rgba(187, 154, 247, 0.25);
     }
 
     .creator-title {
@@ -529,6 +571,16 @@ interface FieldCreatorItem {
         cursor: not-allowed;
         box-shadow: none;
       }
+
+      &.btn-update {
+        background: linear-gradient(135deg, #bb9af7, #7aa2f7);
+        color: #000000;
+        box-shadow: 0 8px 20px rgba(187, 154, 247, 0.3);
+
+        &:hover:not(:disabled) {
+          box-shadow: 0 12px 28px rgba(187, 154, 247, 0.5);
+        }
+      }
     }
 
     .btn-secondary {
@@ -630,10 +682,12 @@ interface FieldCreatorItem {
     }
   `
 })
-export class SurveyCreatorComponent {
+export class SurveyCreatorComponent implements OnChanges {
   readonly store = inject(SurveySyncStore);
 
+  @Input() editTemplate: import('../../models/survey.model').SurveyTemplate | null = null;
   @Output() readonly templateCreated = new EventEmitter<void>();
+  @Output() readonly templateUpdated = new EventEmitter<void>();
   @Output() readonly cancel = new EventEmitter<void>();
 
   readonly surveyName = signal<string>('');
@@ -658,6 +712,26 @@ export class SurveyCreatorComponent {
 
     return true;
   });
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['editTemplate']) {
+      const tpl = changes['editTemplate'].currentValue;
+      if (tpl) {
+        this.surveyName.set(tpl.name);
+        this.surveyDescription.set(tpl.description || '');
+        this.fields.set(
+          tpl.fields.map((f: import('../../models/survey.model').SurveyField) => ({
+            label: f.label,
+            type: f.type,
+            options: f.options ? [...f.options] : [],
+            required: f.required ?? false
+          }))
+        );
+      } else {
+        this.resetCreator();
+      }
+    }
+  }
 
   addField() {
     this.fields.update(curr => [
@@ -722,8 +796,6 @@ export class SurveyCreatorComponent {
   async saveTemplate() {
     if (!this.isValid()) return;
 
-    const id = 'custom_' + Date.now();
-    
     const keysSeen = new Set<string>();
     const compiledFields: SurveyField[] = this.fields().map((f, index) => {
       let baseKey = f.label.toLowerCase()
@@ -759,16 +831,30 @@ export class SurveyCreatorComponent {
       };
     });
 
-    const newTemplate: SurveyTemplate = {
-      id,
-      name: this.surveyName().trim(),
-      description: this.surveyDescription().trim(),
-      fields: compiledFields
-    };
-
-    await this.store.createCustomTemplate(newTemplate);
-    this.resetCreator();
-    this.templateCreated.emit();
+    if (this.editTemplate) {
+      // ─── UPDATE existing template (preserve original ID) ─────────────────
+      const updatedTemplate: SurveyTemplate = {
+        ...this.editTemplate,
+        name: this.surveyName().trim(),
+        description: this.surveyDescription().trim(),
+        fields: compiledFields
+      };
+      await this.store.updateCustomTemplate(updatedTemplate);
+      this.resetCreator();
+      this.templateUpdated.emit();
+    } else {
+      // ─── CREATE new template ───────────────────────────────────────────────
+      const id = 'custom_' + Date.now();
+      const newTemplate: SurveyTemplate = {
+        id,
+        name: this.surveyName().trim(),
+        description: this.surveyDescription().trim(),
+        fields: compiledFields
+      };
+      await this.store.createCustomTemplate(newTemplate);
+      this.resetCreator();
+      this.templateCreated.emit();
+    }
   }
 
   cancelCreation() {

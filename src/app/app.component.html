@@ -187,6 +187,14 @@
                 >
                   🔗 Share
                 </button>
+                <button 
+                  type="button" 
+                  class="btn-edit-card-luxury" 
+                  (click)="$event.stopPropagation(); startEditTemplate(template)"
+                  title="Edit Template"
+                >
+                  ✏️
+                </button>
                 @if (template.id.startsWith('custom_')) {
                   <button 
                     type="button" 
@@ -240,8 +248,10 @@
       </div>
 
       <app-survey-creator 
-        (templateCreated)="currentTab.set('home')" 
-        (cancel)="currentTab.set('home')"
+        [editTemplate]="editingTemplate()"
+        (templateCreated)="currentTab.set('home'); editingTemplate.set(null)" 
+        (templateUpdated)="currentTab.set('home'); editingTemplate.set(null); showToast('Survey updated successfully!')"
+        (cancel)="currentTab.set('home'); editingTemplate.set(null)"
       ></app-survey-creator>
     </section>
   }

@@ -79,6 +79,14 @@ export class ApiService {
       .pipe(catchError(this.handleError));
   }
 
+  updateTemplate(template: SurveyTemplate): Observable<{ message: string; id: string }> {
+    return this.http
+      .put<{ message: string; id: string }>(`${this.base}/templates/${template.id}`, template, {
+        headers: this.authHeaders,
+      })
+      .pipe(catchError(this.handleError));
+  }
+
   deleteTemplate(id: string): Observable<{ message: string }> {
     return this.http
       .delete<{ message: string }>(`${this.base}/templates/${id}`, {

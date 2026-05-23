@@ -166,6 +166,20 @@ export const SurveySyncStore = signalStore(
         }));
       },
 
+      async updateCustomTemplate(template: SurveyTemplate) {
+        // Persist updated schema to local IndexedDB cache
+        await dbService.saveTemplate(template);
+        // Sync updated schema to the cloud API if online
+        if (store.isOnline()) {
+          try { await firstValueFrom(apiService.updateTemplate(template)); } catch { /* offline, changes are in IndexedDB */ }
+        }
+        // Replace the old template entry in the reactive state list
+        patchState(store, (state) => ({
+          templates: state.templates.map(t => t.id === template.id ? template : t),
+          activeTemplate: state.activeTemplate?.id === template.id ? template : state.activeTemplate
+        }));
+      },
+
       async deleteCustomTemplate(id: string) {
         await dbService.deleteTemplate(id);
         if (store.isOnline()) {

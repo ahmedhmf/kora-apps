@@ -23,6 +23,7 @@ export class AppComponent implements OnInit {
   // ─── Direct Share & Toast Notification Signals ────────────────────────────
   readonly isDirectShareLink = signal<boolean>(false);
   readonly toastMessage = signal<string>('');
+  readonly editingTemplate = signal<SurveyTemplate | null>(null);
 
   // ─── Admin Login Modal State ─────────────────────────────────────────────
   readonly showLoginModal = signal<boolean>(false);
@@ -172,6 +173,8 @@ export class AppComponent implements OnInit {
   // ─── Admin Navigation Gate ───────────────────────────────────────────────
   navigateToAdmin(tab: 'creator' | 'results') {
     if (this.isAdminAuthenticated()) {
+      // When navigating to creator for a new survey, clear any edit state
+      if (tab === 'creator') this.editingTemplate.set(null);
       this.currentTab.set(tab);
       if (tab === 'results') {
         this.store.loadSubmissionsFromCloud();
@@ -183,6 +186,11 @@ export class AppComponent implements OnInit {
       this.loginPassword.set('');
       this.showLoginModal.set(true);
     }
+  }
+
+  startEditTemplate(template: SurveyTemplate) {
+    this.editingTemplate.set(template);
+    this.currentTab.set('creator');
   }
 
   async submitLogin() {
