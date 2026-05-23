@@ -102,6 +102,28 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
                     🔒 Your information is stored securely and used only for survey tracking purposes.
                   </p>
                 }
+
+                <!-- GDPR / CCPA Mandatory Consent Checkbox -->
+                <label class="consent-gdpr-row" [class.checked]="consentGiven()" for="gdpr-consent">
+                  <span class="gdpr-checkbox-wrap">
+                    <input
+                      type="checkbox"
+                      id="gdpr-consent"
+                      [checked]="consentGiven()"
+                      (change)="consentGiven.set($any($event.target).checked)"
+                    />
+                    <span class="gdpr-custom-check">
+                      @if (consentGiven()) { <span class="gdpr-checkmark">&#10003;</span> }
+                    </span>
+                  </span>
+                  <span class="gdpr-label-text">
+                    I agree to the
+                    <a href="#" class="gdpr-policy-link" (click)="$event.preventDefault()">Privacy Policy</a>
+                    and consent to my response data being stored securely for survey purposes,
+                    in accordance with GDPR &amp; CCPA regulations.
+                    <span class="gdpr-required-note">Required</span>
+                  </span>
+                </label>
               </div>
 
               <div class="slide-navigation">
@@ -953,6 +975,107 @@ import { SurveySyncStore } from '../../store/survey-sync.store';
       text-align: center;
       line-height: 1.5;
     }
+
+    .consent-gdpr-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      padding: 1.1rem 1.25rem;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-top: 1rem;
+
+      &:hover {
+        border-color: rgba(187, 154, 247, 0.3);
+        background: rgba(187, 154, 247, 0.04);
+      }
+
+      &.checked {
+        border-color: rgba(115, 218, 202, 0.4);
+        background: rgba(115, 218, 202, 0.04);
+      }
+    }
+
+    .gdpr-checkbox-wrap {
+      flex-shrink: 0;
+      position: relative;
+      width: 22px;
+      height: 22px;
+      margin-top: 1px;
+
+      input[type="checkbox"] {
+        position: absolute;
+        opacity: 0;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
+        margin: 0;
+        z-index: 1;
+      }
+    }
+
+    .gdpr-custom-check {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      border: 1.5px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.03);
+      transition: all 0.2s ease;
+      pointer-events: none;
+
+      .consent-gdpr-row.checked & {
+        background: #73daca;
+        border-color: #73daca;
+        box-shadow: 0 0 12px rgba(115, 218, 202, 0.4);
+      }
+    }
+
+    .gdpr-checkmark {
+      color: #000000;
+      font-size: 0.85rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .gdpr-label-text {
+      font-size: 0.82rem;
+      color: rgba(255, 255, 255, 0.55);
+      line-height: 1.55;
+      user-select: none;
+    }
+
+    .gdpr-policy-link {
+      color: #7aa2f7;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      font-weight: 600;
+      transition: color 0.2s ease;
+
+      &:hover {
+        color: #bb9af7;
+      }
+    }
+
+    .gdpr-required-note {
+      display: inline-block;
+      margin-left: 0.4rem;
+      font-size: 0.7rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #f7768e;
+      background: rgba(247, 118, 142, 0.1);
+      border: 1px solid rgba(247, 118, 142, 0.25);
+      padding: 0.1rem 0.5rem;
+      border-radius: 99px;
+      vertical-align: middle;
+    }
   `
 })
 export class GenericSurveyFormComponent {
@@ -967,6 +1090,8 @@ export class GenericSurveyFormComponent {
   readonly respondentName = signal<string>('');
   readonly respondentEmail = signal<string>('');
   readonly isAnonymous = signal<boolean>(false);
+  // GDPR / CCPA explicit consent — mandatory before starting any survey
+  readonly consentGiven = signal<boolean>(false);
 
   readonly clientIdentifier = signal<string>('');
   readonly hoveredRating = signal<number>(0);
@@ -993,6 +1118,8 @@ export class GenericSurveyFormComponent {
   });
 
   readonly canStartSurvey = computed(() => {
+    // Consent is always mandatory regardless of anonymous mode
+    if (!this.consentGiven()) return false;
     if (this.isAnonymous()) return true;
     const name = this.respondentName().trim();
     const email = this.respondentEmail().trim();
@@ -1096,6 +1223,7 @@ export class GenericSurveyFormComponent {
     this.respondentName.set('');
     this.respondentEmail.set('');
     this.isAnonymous.set(false);
+    this.consentGiven.set(false);
     this.clientIdentifier.set('');
     this.answers.set({});
     this.currentStep.set(0);
