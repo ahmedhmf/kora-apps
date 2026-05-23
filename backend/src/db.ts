@@ -48,6 +48,11 @@ export const initDatabase = async (): Promise<void> => {
 
       CREATE INDEX IF NOT EXISTS idx_submissions_created
         ON survey_submissions(created_at DESC);
+
+      -- Self-healing database migrations: ensure new PII columns exist on live database
+      ALTER TABLE survey_submissions ADD COLUMN IF NOT EXISTS respondent_name VARCHAR(500);
+      ALTER TABLE survey_submissions ADD COLUMN IF NOT EXISTS respondent_email VARCHAR(500);
+      ALTER TABLE survey_submissions ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE;
     `);
     console.log('[DB] Schema initialized successfully.');
   } finally {
