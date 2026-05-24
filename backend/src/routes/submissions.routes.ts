@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { pool } from '../db';
 import { requireAdmin, AuthRequest } from '../auth.middleware';
+import { broadcastSubmission } from '../sse-bus';
 
 const router = Router();
 
@@ -63,7 +64,23 @@ router.post('/', submitLimiter, async (req: Request, res: Response): Promise<voi
       return;
     }
 
-    res.status(201).json({ message: 'Submission saved.', id: result.rows[0].id });
+    const newId: number = result.rows[0].id;
+
+    // ─── Push real-time event to all connected admin SSE clients ──────────────
+    broadcastSubmission({
+      id: newId,
+      template_id,
+      respondent_name: safeName,
+      respondent_email: safeEmail,
+      is_anonymous: is_anonymous ?? false,
+      client_identifier: safeIdentifier,
+      answers,
+      uuid: uuid || null,
+      status: 'submitted',
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(201).json({ message: 'Submission saved.', id: newId });
   } catch (err) {
     console.error('[SUBMISSIONS] POST error:', err);
     res.status(500).json({ error: 'Failed to save submission.' });

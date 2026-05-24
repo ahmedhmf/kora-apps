@@ -177,6 +177,15 @@ export class AppComponent implements OnInit, OnDestroy {
       const surveyId = params.get('survey');
       if (surveyId) {
         const template = this.store.templates().find(t => t.id === surveyId);
+        @if (store.liveStreamActive()) {
+          <div class="live-badge" title="Live results streaming">LIVE ⬤</div>
+        }
+        @if (store.syncing()) {
+          <div class="auto-sync-indicator" title="Synchronizing offline responses with cloud...">
+            <span class="auto-sync-spinner"></span>
+            <span class="auto-sync-label">Auto-syncing…</span>
+          </div>
+        }
         if (template) {
           this.isDirectShareLink.set(true);
           this.store.selectTemplate(template);
@@ -203,18 +212,26 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // ─── Admin Navigation Gate ───────────────────────────────────────────────
   navigateToAdmin(tab: 'creator' | 'results') {
+    // If we are leaving the results tab, stop the live stream first
+    if (this.currentTab() === 'results' && tab !== 'results') {
+      this.store.stopLiveStream();
+    }
+
     if (this.isAdminAuthenticated()) {
-      // When navigating to creator for a new survey, clear any edit state
+      // When navigating to results, start the live stream using the stored JWT
+      if (tab === 'results') {
+        const token = this.api.getToken();
+        if (token) this.store.startLiveStream(token);
+      }
+      // When navigating to creator, clear any edit state
       if (tab === 'creator') this.editingTemplate.set(null);
       this.currentTab.set(tab);
       if (tab === 'results') {
         this.store.loadSubmissionsFromCloud();
       }
     } else {
+      // Prompt login flow for admin pages
       this.pendingAdminTab = tab;
-      this.loginError.set('');
-      this.loginUsername.set('');
-      this.loginPassword.set('');
       this.showLoginModal.set(true);
     }
   }

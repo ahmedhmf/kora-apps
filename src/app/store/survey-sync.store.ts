@@ -1,8 +1,9 @@
 import { signalStore, withState, withMethods, withHooks, patchState } from '@ngrx/signals';
 import { inject, effect } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Subscription } from 'rxjs';
 import { IndexedDbService } from '../services/indexed-db.service';
 import { ApiService } from '../services/api.service';
+import { SseService } from '../services/sse.service';
 import { SurveyTemplate, GenericSubmission, SubmissionLogEntry } from '../models/survey.model';
 
 export interface SurveyState {
@@ -10,6 +11,7 @@ export interface SurveyState {
   activeTemplate: SurveyTemplate | null;
   pendingSyncCount: number;
   syncing: boolean;
+  liveStreamActive: boolean;
   templates: SurveyTemplate[];
   submissionsLog: SubmissionLogEntry[];
   history: GenericSubmission[];
@@ -20,15 +22,19 @@ const initialState: SurveyState = {
   activeTemplate: null,
   pendingSyncCount: 0,
   syncing: false,
+  liveStreamActive: false,
   templates: [],
   submissionsLog: [],
   history: []
 };
 
+// Module-level SSE subscription — lives outside the store so it persists
+let sseSubscription: Subscription | null = null;
+
 export const SurveySyncStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
-  withMethods((store, dbService = inject(IndexedDbService), apiService = inject(ApiService)) => {
+  withMethods((store, dbService = inject(IndexedDbService), apiService = inject(ApiService), sseService = inject(SseService)) => {
 
     // Send one submission to the real backend API
     const sendToCloudDatabase = async (submission: GenericSubmission): Promise<void> => {
@@ -237,6 +243,61 @@ export const SurveySyncStore = signalStore(
         } catch (error) {
           console.error('[STORE] Failed to load cloud submissions:', error);
         }
+      },
+
+      startLiveStream(token: string) {
+        // Avoid double-connecting
+        if (sseSubscription || !token) return;
+
+        patchState(store, { liveStreamActive: true });
+        console.log('[SSE] Starting live results stream...');
+
+        const stream$ = sseService.connect(token);
+        sseSubscription = stream$.subscribe({
+          next: (submission: GenericSubmission) => {
+            // Deduplicate: skip if this UUID is already in history
+            const existing = store.history().find(h => h.uuid && h.uuid === submission.uuid);
+            if (existing) return;
+
+            const templateName = store.templates().find(t => t.id === submission.template_id)?.name || 'Survey';
+            const enriched: GenericSubmission = {
+              ...submission,
+              status: 'Synced (Direct)',
+            };
+
+            patchState(store, (state) => ({
+              history: [enriched, ...state.history],
+              submissionsLog: [
+                {
+                  timestamp: new Date().toLocaleTimeString(),
+                  client: submission.client_identifier,
+                  status: 'Live ⬤',
+                  templateName,
+                },
+                ...state.submissionsLog,
+              ],
+            }));
+          },
+          error: () => {
+            // SseService handles reconnection; update badge if permanently closed
+            patchState(store, { liveStreamActive: false });
+            sseSubscription = null;
+          },
+          complete: () => {
+            patchState(store, { liveStreamActive: false });
+            sseSubscription = null;
+          },
+        });
+      },
+
+      stopLiveStream() {
+        sseService.disconnect();
+        if (sseSubscription) {
+          sseSubscription.unsubscribe();
+          sseSubscription = null;
+        }
+        patchState(store, { liveStreamActive: false });
+        console.log('[SSE] Live results stream stopped.');
       },
 
       async saveGenericSubmission(payload: Omit<GenericSubmission, 'id'>) {

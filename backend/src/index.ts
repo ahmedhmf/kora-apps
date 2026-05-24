@@ -7,6 +7,8 @@ import { initDatabase } from './db';
 import authRoutes from './routes/auth.routes';
 import templatesRoutes from './routes/templates.routes';
 import submissionsRoutes from './routes/submissions.routes';
+import eventsRoutes from './routes/events.routes';
+import { broadcastHeartbeat } from './sse-bus';
 
 dotenv.config();
 
@@ -43,6 +45,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/templates', templatesRoutes);
 app.use('/api/submissions', submissionsRoutes);
+app.use('/api/events', eventsRoutes);
 
 // ─── 404 Fallback ─────────────────────────────────────────────────────────────
 app.use('/api', (_req, res) => {
@@ -55,6 +58,8 @@ const start = async () => {
     await initDatabase();
     app.listen(PORT, () => {
       console.log(`[API] Server running on port ${PORT}`);
+      // Global heartbeat — pings all connected SSE admin clients every 25 s
+      setInterval(broadcastHeartbeat, 25_000);
     });
   } catch (err) {
     console.error('[API] Failed to start:', err);
