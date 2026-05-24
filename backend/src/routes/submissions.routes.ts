@@ -90,7 +90,12 @@ router.post('/', submitLimiter, async (req: Request, res: Response): Promise<voi
 // ─── GET submissions (ADMIN only) ────────────────────────────────────────────
 router.get('/', requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { template_id, search } = req.query;
+    const { template_id, search, limit: limitParam, offset: offsetParam } = req.query;
+
+    const limitVal = limitParam ? parseInt(limitParam as string, 10) : 50;
+    const offsetVal = offsetParam ? parseInt(offsetParam as string, 10) : 0;
+    const limit = isNaN(limitVal) || limitVal < 1 ? 50 : Math.min(limitVal, 100);
+    const offset = isNaN(offsetVal) || offsetVal < 0 ? 0 : offsetVal;
 
     let query = `
       SELECT
@@ -101,7 +106,7 @@ router.get('/', requireAdmin, async (req: AuthRequest, res: Response): Promise<v
       FROM survey_submissions
     `;
 
-    const params: (string | boolean)[] = [];
+    const params: (string | boolean | number)[] = [];
     const conditions: string[] = [];
 
     if (template_id) {
@@ -122,13 +127,154 @@ router.get('/', requireAdmin, async (req: AuthRequest, res: Response): Promise<v
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
 
+    // Run count query with the same conditions
+    let countQuery = 'SELECT COUNT(*) FROM survey_submissions';
+    if (conditions.length > 0) {
+      countQuery += ` WHERE ${conditions.join(' AND ')}`;
+    }
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0].count, 10);
+
     query += ' ORDER BY created_at DESC';
 
+    // Add pagination
+    params.push(limit);
+    query += ` LIMIT $${params.length}`;
+
+    params.push(offset);
+    query += ` OFFSET $${params.length}`;
+
     const result = await pool.query(query, params);
-    res.json(result.rows);
+    res.json({
+      submissions: result.rows,
+      total
+    });
   } catch (err) {
     console.error('[SUBMISSIONS] GET error:', err);
     res.status(500).json({ error: 'Failed to fetch submissions.' });
+  }
+});
+
+// ─── GET submissions statistics summary (ADMIN only) ─────────────────────────
+router.get('/stats', requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { template_id } = req.query;
+    if (!template_id) {
+      res.status(400).json({ error: '`template_id` is required.' });
+      return;
+    }
+
+    // Fetch all submissions for this template
+    const result = await pool.query(
+      `SELECT status, client_identifier, answers, created_at AS timestamp
+       FROM survey_submissions
+       WHERE template_id = $1`,
+      [template_id as string]
+    );
+
+    const rows = result.rows;
+    const total = rows.length;
+
+    // Initialize stats containers
+    let syncedCount = 0;
+    const starSums: Record<string, number> = {};
+    const starCountsForAvg: Record<string, number> = {};
+    
+    const optionCounts: Record<string, Record<string, number>> = {};
+    const starCounts: Record<string, Record<number, number>> = {};
+    const numericLists: Record<string, number[]> = {};
+    const textComments: Record<string, { client: string; text: string; timestamp: string }[]> = {};
+
+    for (const row of rows) {
+      const status: string = row.status || '';
+      if (status.toLowerCase().startsWith('synced') || status.toLowerCase().startsWith('submitted')) {
+        syncedCount++;
+      }
+
+      const client = row.client_identifier || 'Unknown';
+      const timestamp = row.timestamp ? new Date(row.timestamp).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : 'Unknown Time';
+      const answers = typeof row.answers === 'string' ? JSON.parse(row.answers) : (row.answers || {});
+
+      for (const [fieldKey, val] of Object.entries(answers)) {
+        if (val === undefined || val === null || val === '') continue;
+
+        const stringVal = String(val).trim();
+
+        // 1. Check for options/choices (multiple choices are comma-separated)
+        if (!optionCounts[fieldKey]) optionCounts[fieldKey] = {};
+        const choices = stringVal.split(',').map(c => c.trim());
+        for (const choice of choices) {
+          if (choice) {
+            optionCounts[fieldKey][choice] = (optionCounts[fieldKey][choice] || 0) + 1;
+          }
+        }
+
+        // 2. Check for numeric and star rating
+        const numVal = Number(stringVal);
+        if (!isNaN(numVal)) {
+          // It's a number — could be a star rating or numeric parameter
+          if (!numericLists[fieldKey]) numericLists[fieldKey] = [];
+          numericLists[fieldKey].push(numVal);
+
+          // Star rating counts (1 to 5)
+          const starRating = Math.round(numVal);
+          if (starRating >= 1 && starRating <= 5) {
+            if (!starCounts[fieldKey]) {
+              starCounts[fieldKey] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+            }
+            starCounts[fieldKey][starRating] = (starCounts[fieldKey][starRating] || 0) + 1;
+
+            starSums[fieldKey] = (starSums[fieldKey] || 0) + numVal;
+            starCountsForAvg[fieldKey] = (starCountsForAvg[fieldKey] || 0) + 1;
+          }
+        }
+
+        // 3. Keep text responses (only if it doesn't look like a single choice)
+        if (stringVal.length > 0) {
+          if (!textComments[fieldKey]) textComments[fieldKey] = [];
+          // Keep only the most recent 100 entries to prevent memory overflow
+          if (textComments[fieldKey].length < 100) {
+            textComments[fieldKey].push({
+              client,
+              text: stringVal,
+              timestamp
+            });
+          }
+        }
+      }
+    }
+
+    // Post-process metrics
+    const starAverages: Record<string, number> = {};
+    for (const [key, sum] of Object.entries(starSums)) {
+      const count = starCountsForAvg[key] || 0;
+      starAverages[key] = count > 0 ? parseFloat((sum / count).toFixed(1)) : 0;
+    }
+
+    const numericStats: Record<string, { min: number | string; max: number | string; avg: number | string; count: number }> = {};
+    for (const [key, list] of Object.entries(numericLists)) {
+      if (list.length === 0) continue;
+      const min = Math.min(...list);
+      const max = Math.max(...list);
+      const sum = list.reduce((a, b) => a + b, 0);
+      const avg = parseFloat((sum / list.length).toFixed(1));
+      numericStats[key] = { min, max, avg, count: list.length };
+    }
+
+    const syncPercentage = total > 0 ? Math.round((syncedCount / total) * 100) : 0;
+
+    res.json({
+      total,
+      syncPercentage,
+      starAverages,
+      optionCounts,
+      starCounts,
+      numericStats,
+      textResponses: textComments
+    });
+  } catch (err) {
+    console.error('[SUBMISSIONS] Stats error:', err);
+    res.status(500).json({ error: 'Failed to compute submission statistics.' });
   }
 });
 

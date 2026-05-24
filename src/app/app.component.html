@@ -303,7 +303,7 @@
               <button 
                 type="button" 
                 class="survey-dashboard-card"
-                (click)="activeDashboardTemplate.set(template)"
+                (click)="selectDashboardTemplate(template)"
               >
                 <div class="card-glow-layer"></div>
                 
@@ -350,7 +350,7 @@
             <button 
               type="button" 
               class="btn-back-directory" 
-              (click)="activeDashboardTemplate.set(null); resultsSearchQuery.set('')"
+              (click)="closeDashboard()"
             >
               ← Back to Directories
             </button>
@@ -612,90 +612,182 @@
                     class="control-search" 
                     placeholder="Filter by facility / client..." 
                     [value]="resultsSearchQuery()"
-                    (input)="resultsSearchQuery.set($any($event.target).value)"
+                    (input)="onSearchQueryInput($any($event.target).value)"
                   />
                 </div>
               </div>
 
-              <div class="explorer-submissions-grid">
-                @for (record of dashboardSubmissions(); track record.id) {
-                  <div class="result-card">
-                    <div class="card-corner-glow"></div>
-                    
-                    <div class="result-card-header">
-                      <div class="header-main-group">
-                        <span class="result-client">{{ record.client_identifier }}</span>
-                        <span class="result-time">🕒 Completed: {{ record.timestamp }}</span>
-                      </div>
-                      
-                      <div class="header-meta-group">
-                        <span class="badge" [class]="record.status?.toLowerCase()?.replace(' ', '-')?.replace('(', '')?.replace(')', '') || 'saved-offline'">
-                          {{ record.status }}
-                        </span>
-                        <button 
-                          type="button" 
-                          class="btn-delete-entry" 
-                          (click)="deleteHistoryEntry(record.id!)"
-                          title="Delete this record"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    <div class="result-card-body">
-                      <div class="answers-grid">
-                        @for (field of active.fields; track field.key) {
-                          <div class="answer-item">
-                            <span class="answer-label">{{ field.label }}</span>
-                            
-                            @if (field.type === 'star') {
-                              <div class="star-rating-display">
-                                <div class="stars-stars">
-                                  @for (star of [1, 2, 3, 4, 5]; track star) {
-                                    <span class="star-display-icon" [class.filled]="+(record.answers[field.key] || 0) >= star">★</span>
-                                  }
-                                </div>
-                                <span class="star-display-text">{{ record.answers[field.key] || '0' }} / 5 Stars</span>
-                              </div>
-                            } @else if (field.type === 'dropdown' || field.type === 'radio') {
-                              <span class="answer-value-pill">{{ record.answers[field.key] || 'N/A' }}</span>
-                            } @else if (field.type === 'checkbox') {
-                              @let choicesList = (record.answers[field.key] || '').split(',');
-                              <div class="checkbox-pills-row">
-                                @for (choice of choicesList; track choice) {
-                                  @if (choice.trim()) {
-                                    <span class="answer-value-pill checkbox-pill">{{ choice.trim() }}</span>
-                                  }
-                                } @empty {
-                                  <span class="answer-value-pill na-pill">N/A</span>
-                                }
-                              </div>
-                            } @else {
-                              <div class="answer-value-box">
-                                {{ record.answers[field.key] || '(No response provided)' }}
-                              </div>
-                            }
-                          </div>
-                        } @empty {
-                          <span class="no-fields-desc">This evaluation has no question values.</span>
-                        }
-                      </div>
-                    </div>
-                  </div>
-                } @empty {
-                  <div class="results-empty-state inner-empty-state">
-                    <span class="empty-icon">📊</span>
-                    @if (store.history().filter(s => s.template_id === active.id).length === 0) {
-                      <h3>No Evaluations Captured</h3>
-                      <p>No completed submissions are saved for this survey layout yet.</p>
-                    } @else {
-                      <h3>No Matching Results</h3>
-                      <p>No archived response matches your facility search query. Try typing another client keyword.</p>
-                    }
+              <div class="explorer-relative-wrapper">
+                <!-- Sleek Glassmorphic Loading Spinner Overlay -->
+                @if (store.explorerLoading()) {
+                  <div class="explorer-glass-overlay">
+                    <span class="glass-spinner"></span>
+                    <span class="glass-spinner-text">Fetching Records…</span>
                   </div>
                 }
+
+                <div class="explorer-submissions-grid" [class.blur-content]="store.explorerLoading()">
+                  @for (record of store.explorerSubmissions(); track record.uuid || record.id) {
+                    <div class="result-card">
+                      <div class="card-corner-glow"></div>
+                      
+                      <div class="result-card-header">
+                        <div class="header-main-group">
+                          <span class="result-client">{{ record.client_identifier }}</span>
+                          <span class="result-time">🕒 Completed: {{ record.timestamp }}</span>
+                        </div>
+                        
+                        <div class="header-meta-group">
+                          <span class="badge" [class]="record.status?.toLowerCase()?.replace(' ', '-')?.replace('(', '')?.replace(')', '') || 'saved-offline'">
+                            {{ record.status }}
+                          </span>
+                          <button 
+                            type="button" 
+                            class="btn-delete-entry" 
+                            (click)="deleteHistoryEntry(record.id!)"
+                            title="Delete this record"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+
+                      <div class="result-card-body">
+                        <div class="answers-grid">
+                          @for (field of active.fields; track field.key) {
+                            <div class="answer-item">
+                              <span class="answer-label">{{ field.label }}</span>
+                              
+                              @if (field.type === 'star') {
+                                <div class="star-rating-display">
+                                  <div class="stars-stars">
+                                    @for (star of [1, 2, 3, 4, 5]; track star) {
+                                      <span class="star-display-icon" [class.filled]="+(record.answers[field.key] || 0) >= star">★</span>
+                                    }
+                                  </div>
+                                  <span class="star-display-text">{{ record.answers[field.key] || '0' }} / 5 Stars</span>
+                                </div>
+                              } @else if (field.type === 'dropdown' || field.type === 'radio') {
+                                <span class="answer-value-pill">{{ record.answers[field.key] || 'N/A' }}</span>
+                              } @else if (field.type === 'checkbox') {
+                                @let choicesList = (record.answers[field.key] || '').split(',');
+                                <div class="checkbox-pills-row">
+                                  @for (choice of choicesList; track choice) {
+                                    @if (choice.trim()) {
+                                      <span class="answer-value-pill checkbox-pill">{{ choice.trim() }}</span>
+                                    }
+                                  } @empty {
+                                    <span class="answer-value-pill na-pill">N/A</span>
+                                  }
+                                </div>
+                              } @else {
+                                <div class="answer-value-box">
+                                  {{ record.answers[field.key] || '(No response provided)' }}
+                                </div>
+                              }
+                            </div>
+                          } @empty {
+                            <span class="no-fields-desc">This evaluation has no question values.</span>
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  } @empty {
+                    <div class="results-empty-state inner-empty-state">
+                      <span class="empty-icon">📊</span>
+                      @if (store.explorerTotalCount() === 0) {
+                        <h3>No Evaluations Captured</h3>
+                        <p>No completed submissions are saved for this survey layout yet.</p>
+                      } @else {
+                        <h3>No Matching Results</h3>
+                        <p>No archived response matches your search query. Try typing another keyword.</p>
+                      }
+                    </div>
+                  }
+                </div>
               </div>
+
+              <!-- Premium Glassmorphic Pagination Controls Bar -->
+              @if (store.explorerTotalCount() > 0) {
+                <div class="premium-pagination-bar">
+                  <div class="pagination-info">
+                    Showing 
+                    <span class="highlight-val">{{ showingStart() }}</span>
+                    to 
+                    <span class="highlight-val">{{ showingEnd() }}</span>
+                    of 
+                    <span class="highlight-val">{{ store.explorerTotalCount() }}</span> 
+                    responses
+                  </div>
+
+                  <div class="pagination-buttons">
+                    <button 
+                      type="button" 
+                      class="btn-pager step"
+                      [disabled]="currentPage() === 1"
+                      (click)="goToPage(1)"
+                      title="First Page"
+                    >
+                      «
+                    </button>
+                    <button 
+                      type="button" 
+                      class="btn-pager step"
+                      [disabled]="currentPage() === 1"
+                      (click)="goToPage(currentPage() - 1)"
+                      title="Previous Page"
+                    >
+                      ‹
+                    </button>
+
+                    @for (page of visiblePages(); track page) {
+                      <button 
+                        type="button" 
+                        class="btn-pager page-num"
+                        [class.active]="currentPage() === page"
+                        (click)="goToPage(page)"
+                      >
+                        {{ page }}
+                      </button>
+                    }
+
+                    <button 
+                      type="button" 
+                      class="btn-pager step"
+                      [disabled]="currentPage() === totalPages()"
+                      (click)="goToPage(currentPage() + 1)"
+                      title="Next Page"
+                    >
+                      ›
+                    </button>
+                    <button 
+                      type="button" 
+                      class="btn-pager step"
+                      [disabled]="currentPage() === totalPages()"
+                      (click)="goToPage(totalPages())"
+                      title="Last Page"
+                    >
+                      »
+                    </button>
+                  </div>
+
+                  <div class="pagination-size">
+                    <span class="size-label">Per page:</span>
+                    <div class="size-options">
+                      @for (size of [10, 25, 50]; track size) {
+                        <button 
+                          type="button"
+                          class="btn-size-choice"
+                          [class.active]="pageSize() === size"
+                          (click)="changePageSize(size)"
+                        >
+                          {{ size }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                </div>
+              }
             </div>
 
           </div>

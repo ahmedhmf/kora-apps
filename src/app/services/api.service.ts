@@ -103,13 +103,30 @@ export class ApiService {
       .pipe(catchError(this.handleError));
   }
 
-  getSubmissions(templateId?: string, search?: string): Observable<GenericSubmission[]> {
+  getSubmissions(
+    templateId?: string,
+    search?: string,
+    limit?: number,
+    offset?: number
+  ): Observable<{ submissions: GenericSubmission[]; total: number }> {
     let params = new HttpParams();
     if (templateId) params = params.set('template_id', templateId);
     if (search)     params = params.set('search', search);
+    if (limit !== undefined)  params = params.set('limit', limit.toString());
+    if (offset !== undefined) params = params.set('offset', offset.toString());
 
     return this.http
-      .get<GenericSubmission[]>(`${this.base}/submissions`, {
+      .get<{ submissions: GenericSubmission[]; total: number }>(`${this.base}/submissions`, {
+        headers: this.authHeaders,
+        params,
+      })
+      .pipe(catchError(this.handleError));
+  }
+
+  getSubmissionStats(templateId: string): Observable<any> {
+    let params = new HttpParams().set('template_id', templateId);
+    return this.http
+      .get<any>(`${this.base}/submissions/stats`, {
         headers: this.authHeaders,
         params,
       })

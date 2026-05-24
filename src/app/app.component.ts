@@ -1,9 +1,10 @@
 import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { GenericSurveyFormComponent } from './components/generic-survey-form/generic-survey-form.component';
 import { SurveyCreatorComponent } from './components/survey-creator/survey-creator.component';
 import { SurveySyncStore } from './store/survey-sync.store';
 import { ApiService } from './services/api.service';
-import { SurveyTemplate } from './models/survey.model';
+import { SurveyTemplate, GenericSubmission } from './models/survey.model';
 
 @Component({
   selector: 'app-root',
@@ -19,6 +20,11 @@ export class AppComponent implements OnInit, OnDestroy {
 
   readonly activeDashboardTemplate = signal<SurveyTemplate | null>(null);
   readonly resultsSearchQuery = signal<string>('');
+
+  // ─── Pagination Signals ───────────────────────────────────────────────────
+  readonly currentPage = signal<number>(1);
+  readonly pageSize = signal<number>(10);
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ─── Direct Share & Toast Notification Signals ────────────────────────────
   readonly isDirectShareLink = signal<boolean>(false);
@@ -177,15 +183,6 @@ export class AppComponent implements OnInit, OnDestroy {
       const surveyId = params.get('survey');
       if (surveyId) {
         const template = this.store.templates().find(t => t.id === surveyId);
-        @if (store.liveStreamActive()) {
-          <div class="live-badge" title="Live results streaming">LIVE ⬤</div>
-        }
-        @if (store.syncing()) {
-          <div class="auto-sync-indicator" title="Synchronizing offline responses with cloud...">
-            <span class="auto-sync-spinner"></span>
-            <span class="auto-sync-label">Auto-syncing…</span>
-          </div>
-        }
         if (template) {
           this.isDirectShareLink.set(true);
           this.store.selectTemplate(template);
@@ -351,11 +348,26 @@ export class AppComponent implements OnInit, OnDestroy {
     return template ? template.fields : [];
   }
 
-  exportToCsv() {
+  async exportToCsv() {
     const active = this.activeDashboardTemplate();
     if (!active) return;
 
-    const subs = this.dashboardSubmissions();
+    let subs: GenericSubmission[] = [];
+    if (this.store.isOnline() && this.api.isAuthenticated()) {
+      try {
+        this.showToast('Generating CSV report...', '📥');
+        const res = await firstValueFrom(this.api.getSubmissions(active.id, undefined, 100000, 0));
+        subs = res.submissions;
+      } catch (error) {
+        console.error('[CSV] Failed to fetch cloud records for export:', error);
+        this.showToast('Failed to load cloud history.');
+        return;
+      }
+    } else {
+      // Offline fallback: load from local history
+      subs = this.store.history().filter(s => s.template_id === active.id);
+    }
+
     if (subs.length === 0) {
       this.showToast('No submissions to export.');
       return;
@@ -417,7 +429,7 @@ export class AppComponent implements OnInit, OnDestroy {
     link.click();
     document.body.removeChild(link);
 
-    this.showToast('CSV report downloaded!');
+    this.showToast('CSV report downloaded!', '📥');
   }
 
   async confirmClearHistory() {
@@ -445,7 +457,95 @@ export class AppComponent implements OnInit, OnDestroy {
     }
   }
 
+  // ─── Dashboard Pagination & Search Controllers ─────────────────────────────
+  selectDashboardTemplate(template: SurveyTemplate) {
+    this.activeDashboardTemplate.set(template);
+    this.currentPage.set(1);
+    this.resultsSearchQuery.set('');
+    this.store.loadDashboardStats(template.id);
+    this.loadCurrentPage();
+  }
+
+  closeDashboard() {
+    this.activeDashboardTemplate.set(null);
+    this.resultsSearchQuery.set('');
+    this.currentPage.set(1);
+  }
+
+  async loadCurrentPage() {
+    const active = this.activeDashboardTemplate();
+    if (!active) return;
+
+    const search = this.resultsSearchQuery();
+    const limit = this.pageSize();
+    const offset = (this.currentPage() - 1) * limit;
+
+    await this.store.loadExplorerSubmissions(active.id, search, limit, offset);
+  }
+
+  onSearchQueryInput(query: string) {
+    this.resultsSearchQuery.set(query);
+    if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer);
+    this.searchDebounceTimer = setTimeout(() => {
+      this.currentPage.set(1);
+      this.loadCurrentPage();
+    }, 300);
+  }
+
+  goToPage(page: number) {
+    const totalPages = this.totalPages();
+    if (page < 1 || page > totalPages) return;
+    this.currentPage.set(page);
+    this.loadCurrentPage();
+  }
+
+  changePageSize(size: number) {
+    this.pageSize.set(size);
+    this.currentPage.set(1);
+    this.loadCurrentPage();
+  }
+
+  readonly totalPages = computed(() => {
+    const total = this.store.explorerTotalCount();
+    const size = this.pageSize();
+    return Math.ceil(total / size) || 1;
+  });
+
+  readonly visiblePages = computed(() => {
+    const current = this.currentPage();
+    const total = this.totalPages();
+    const pages: number[] = [];
+    
+    // Show up to 5 page choices around current
+    let start = Math.max(1, current - 2);
+    let end = Math.min(total, start + 4);
+    if (end - start < 4) {
+      start = Math.max(1, end - 4);
+    }
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  });
+
+  readonly showingStart = computed(() => {
+    if (this.store.explorerTotalCount() === 0) return 0;
+    return ((this.currentPage() - 1) * this.pageSize()) + 1;
+  });
+
+  readonly showingEnd = computed(() => {
+    const end = this.currentPage() * this.pageSize();
+    const total = this.store.explorerTotalCount();
+    return end > total ? total : end;
+  });
+
+  // ─── Refactored Analytical Helper Methods ─────────────────────────────────
   getAverageStarRating(templateId: string, fieldKey: string): number {
+    const stats = this.store.dashboardStats();
+    if (stats && stats.starAverages) {
+      return stats.starAverages[fieldKey] || 0;
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     if (subs.length === 0) return 0;
     let sum = 0;
@@ -461,6 +561,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getOptionCount(templateId: string, fieldKey: string, option: string): number {
+    const stats = this.store.dashboardStats();
+    if (stats && stats.optionCounts && stats.optionCounts[fieldKey]) {
+      return stats.optionCounts[fieldKey][option] || 0;
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     let count = 0;
     for (const sub of subs) {
@@ -474,6 +579,14 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getOptionPercentage(templateId: string, fieldKey: string, option: string): number {
+    const stats = this.store.dashboardStats();
+    if (stats) {
+      const total = stats.total || 0;
+      if (total === 0) return 0;
+      const count = this.getOptionCount(templateId, fieldKey, option);
+      return Math.round((count / total) * 100);
+    }
+    // Fallback
     const total = this.store.history().filter(s => s.template_id === templateId).length;
     if (total === 0) return 0;
     const count = this.getOptionCount(templateId, fieldKey, option);
@@ -481,6 +594,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getStarRatingCount(templateId: string, fieldKey: string, star: number): number {
+    const stats = this.store.dashboardStats();
+    if (stats && stats.starCounts && stats.starCounts[fieldKey]) {
+      return stats.starCounts[fieldKey][star] || 0;
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     let count = 0;
     for (const sub of subs) {
@@ -495,6 +613,20 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getStarRatingPercentage(templateId: string, fieldKey: string, star: number): number {
+    const stats = this.store.dashboardStats();
+    if (stats) {
+      const starCountsGroup = stats.starCounts && stats.starCounts[fieldKey];
+      let validCount = 0;
+      if (starCountsGroup) {
+        for (let r = 1; r <= 5; r++) {
+          validCount += starCountsGroup[r] || 0;
+        }
+      }
+      if (validCount === 0) return 0;
+      const count = this.getStarRatingCount(templateId, fieldKey, star);
+      return Math.round((count / validCount) * 100);
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     const validSubs = subs.filter(s => {
       const val = s.answers[fieldKey];
@@ -506,6 +638,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getNumericStats(templateId: string, fieldKey: string) {
+    const stats = this.store.dashboardStats();
+    if (stats && stats.numericStats && stats.numericStats[fieldKey]) {
+      return stats.numericStats[fieldKey];
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     const nums: number[] = [];
     for (const sub of subs) {
@@ -528,6 +665,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getTextResponses(templateId: string, fieldKey: string) {
+    const stats = this.store.dashboardStats();
+    if (stats && stats.textResponses && stats.textResponses[fieldKey]) {
+      return stats.textResponses[fieldKey];
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     const results: { client: string; text: string; timestamp: string }[] = [];
     for (const sub of subs) {
@@ -544,6 +686,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getSyncPercentage(templateId: string): number {
+    const stats = this.store.dashboardStats();
+    if (stats && stats.syncPercentage !== undefined) {
+      return stats.syncPercentage;
+    }
+    // Fallback
     const subs = this.store.history().filter(s => s.template_id === templateId);
     if (subs.length === 0) return 0;
     const synced = subs.filter(s => s.status && s.status.toLowerCase().startsWith('synced')).length;

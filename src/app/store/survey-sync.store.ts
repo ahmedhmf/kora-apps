@@ -15,6 +15,10 @@ export interface SurveyState {
   templates: SurveyTemplate[];
   submissionsLog: SubmissionLogEntry[];
   history: GenericSubmission[];
+  explorerSubmissions: GenericSubmission[];
+  explorerTotalCount: number;
+  explorerLoading: boolean;
+  dashboardStats: any | null;
 }
 
 const initialState: SurveyState = {
@@ -25,7 +29,11 @@ const initialState: SurveyState = {
   liveStreamActive: false,
   templates: [],
   submissionsLog: [],
-  history: []
+  history: [],
+  explorerSubmissions: [],
+  explorerTotalCount: 0,
+  explorerLoading: false,
+  dashboardStats: null
 };
 
 // Module-level SSE subscription — lives outside the store so it persists
@@ -233,15 +241,160 @@ export const SurveySyncStore = signalStore(
       async loadSubmissionsFromCloud() {
         if (!store.isOnline() || !apiService.isAuthenticated()) return;
         try {
-          const cloud = await firstValueFrom(apiService.getSubmissions());
+          const res = await firstValueFrom(apiService.getSubmissions(undefined, undefined, 100, 0));
           const pending = await dbService.getAllSubmissions();
           const combined = [
             ...pending.map(p => ({ ...p, status: 'Offline Cached' })),
-            ...cloud.map(c => ({ ...c, status: 'Synced (Direct)' }))
+            ...res.submissions.map(c => ({ ...c, status: 'Synced (Direct)' }))
           ];
           patchState(store, { history: combined });
         } catch (error) {
           console.error('[STORE] Failed to load cloud submissions:', error);
+        }
+      },
+
+      async loadExplorerSubmissions(templateId: string, search: string, limit: number, offset: number) {
+        patchState(store, { explorerLoading: true });
+        try {
+          if (store.isOnline() && apiService.isAuthenticated()) {
+            const res = await firstValueFrom(apiService.getSubmissions(templateId, search, limit, offset));
+            patchState(store, {
+              explorerSubmissions: res.submissions,
+              explorerTotalCount: res.total
+            });
+          } else {
+            // Offline fallback: load from local IndexedDB history
+            const localHistory = await dbService.getAllHistorySubmissions();
+            const query = search.trim().toLowerCase();
+            const filtered = localHistory.filter(item => {
+              const matchesSurvey = item.template_id === templateId;
+              const matchesSearch = query === '' || item.client_identifier.toLowerCase().includes(query) || (item.respondent_name && item.respondent_name.toLowerCase().includes(query)) || (item.respondent_email && item.respondent_email.toLowerCase().includes(query));
+              return matchesSurvey && matchesSearch;
+            });
+            const paged = filtered.slice(offset, offset + limit);
+            patchState(store, {
+              explorerSubmissions: paged,
+              explorerTotalCount: filtered.length
+            });
+          }
+        } catch (error) {
+          console.error('[STORE] Failed to load explorer submissions:', error);
+        } finally {
+          patchState(store, { explorerLoading: false });
+        }
+      },
+
+      async loadDashboardStats(templateId: string) {
+        if (store.isOnline() && apiService.isAuthenticated()) {
+          try {
+            const stats = await firstValueFrom(apiService.getSubmissionStats(templateId));
+            patchState(store, { dashboardStats: stats });
+            return;
+          } catch (error) {
+            console.warn('[STORE] Failed to load stats from server — calculating locally.', error);
+          }
+        }
+
+        // Offline / Fallback: Compute statistics locally from IndexedDB history
+        try {
+          const localHistory = await dbService.getAllHistorySubmissions();
+          const rows = localHistory.filter(h => h.template_id === templateId);
+          const total = rows.length;
+
+          let syncedCount = 0;
+          const starSums: Record<string, number> = {};
+          const starCountsForAvg: Record<string, number> = {};
+          
+          const optionCounts: Record<string, Record<string, number>> = {};
+          const starCounts: Record<string, Record<number, number>> = {};
+          const numericLists: Record<string, number[]> = {};
+          const textComments: Record<string, { client: string; text: string; timestamp: string }[]> = {};
+
+          for (const row of rows) {
+            const status: string = row.status || '';
+            if (status.toLowerCase().startsWith('synced') || status.toLowerCase().startsWith('submitted')) {
+              syncedCount++;
+            }
+
+            const client = row.client_identifier || 'Unknown';
+            const timestamp = row.timestamp || 'Unknown Time';
+            const answers = row.answers || {};
+
+            for (const [fieldKey, val] of Object.entries(answers)) {
+              if (val === undefined || val === null || val === '') continue;
+
+              const stringVal = String(val).trim();
+
+              // 1. Check options
+              if (!optionCounts[fieldKey]) optionCounts[fieldKey] = {};
+              const choices = stringVal.split(',').map(c => c.trim());
+              for (const choice of choices) {
+                if (choice) {
+                  optionCounts[fieldKey][choice] = (optionCounts[fieldKey][choice] || 0) + 1;
+                }
+              }
+
+              // 2. Check numeric and star rating
+              const numVal = Number(stringVal);
+              if (!isNaN(numVal)) {
+                if (!numericLists[fieldKey]) numericLists[fieldKey] = [];
+                numericLists[fieldKey].push(numVal);
+
+                const starRating = Math.round(numVal);
+                if (starRating >= 1 && starRating <= 5) {
+                  if (!starCounts[fieldKey]) {
+                    starCounts[fieldKey] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                  }
+                  starCounts[fieldKey][starRating] = (starCounts[fieldKey][starRating] || 0) + 1;
+
+                  starSums[fieldKey] = (starSums[fieldKey] || 0) + numVal;
+                  starCountsForAvg[fieldKey] = (starCountsForAvg[fieldKey] || 0) + 1;
+                }
+              }
+
+              // 3. Keep text responses
+              if (stringVal.length > 0) {
+                if (!textComments[fieldKey]) textComments[fieldKey] = [];
+                if (textComments[fieldKey].length < 100) {
+                  textComments[fieldKey].push({ client, text: stringVal, timestamp });
+                }
+              }
+            }
+          }
+
+          // Averages
+          const starAverages: Record<string, number> = {};
+          for (const [key, sum] of Object.entries(starSums)) {
+            const count = starCountsForAvg[key] || 0;
+            starAverages[key] = count > 0 ? parseFloat((sum / count).toFixed(1)) : 0;
+          }
+
+          // Numeric Stats
+          const numericStats: Record<string, { min: number | string; max: number | string; avg: number | string; count: number }> = {};
+          for (const [key, list] of Object.entries(numericLists)) {
+            if (list.length === 0) continue;
+            const min = Math.min(...list);
+            const max = Math.max(...list);
+            const sum = list.reduce((a, b) => a + b, 0);
+            const avg = parseFloat((sum / list.length).toFixed(1));
+            numericStats[key] = { min, max, avg, count: list.length };
+          }
+
+          const syncPercentage = total > 0 ? Math.round((syncedCount / total) * 100) : 0;
+
+          patchState(store, {
+            dashboardStats: {
+              total,
+              syncPercentage,
+              starAverages,
+              optionCounts,
+              starCounts,
+              numericStats,
+              textResponses: textComments
+            }
+          });
+        } catch (err) {
+          console.error('[STORE] Failed to compute local offline statistics:', err);
         }
       },
 
@@ -265,9 +418,10 @@ export const SurveySyncStore = signalStore(
               status: 'Synced (Direct)',
             };
 
-            patchState(store, (state) => ({
-              history: [enriched, ...state.history],
-              submissionsLog: [
+            patchState(store, (state) => {
+              // Prepend to history & submissions log
+              const updatedHistory = [enriched, ...state.history];
+              const updatedLogs = [
                 {
                   timestamp: new Date().toLocaleTimeString(),
                   client: submission.client_identifier,
@@ -275,11 +429,105 @@ export const SurveySyncStore = signalStore(
                   templateName,
                 },
                 ...state.submissionsLog,
-              ],
-            }));
+              ];
+
+              // Dynamic real-time explorer & dashboard stats enrichment
+              const activeDashboard = state.activeTemplate;
+              let explorerSubmissions = state.explorerSubmissions;
+              let explorerTotalCount = state.explorerTotalCount;
+              let dashboardStats = state.dashboardStats;
+
+              if (activeDashboard && submission.template_id === activeDashboard.id) {
+                explorerSubmissions = [enriched, ...explorerSubmissions];
+                explorerTotalCount = explorerTotalCount + 1;
+
+                if (dashboardStats) {
+                  const newTotal = dashboardStats.total + 1;
+                  const starAverages = { ...dashboardStats.starAverages };
+                  const starCounts = { ...dashboardStats.starCounts };
+                  const optionCounts = { ...dashboardStats.optionCounts };
+                  const numericStats = { ...dashboardStats.numericStats };
+                  const textResponses = { ...dashboardStats.textResponses };
+
+                  const answers = typeof submission.answers === 'string' ? JSON.parse(submission.answers) : (submission.answers || {});
+
+                  for (const [fieldKey, val] of Object.entries(answers)) {
+                    if (val === undefined || val === null || val === '') continue;
+                    const stringVal = String(val).trim();
+
+                    // Choice options counts
+                    if (!optionCounts[fieldKey]) optionCounts[fieldKey] = {};
+                    const choices = stringVal.split(',').map(c => c.trim());
+                    for (const choice of choices) {
+                      if (choice) {
+                        optionCounts[fieldKey][choice] = (optionCounts[fieldKey][choice] || 0) + 1;
+                      }
+                    }
+
+                    // Numeric/Star Rating
+                    const numVal = Number(stringVal);
+                    if (!isNaN(numVal)) {
+                      // Numeric
+                      const prevNum = numericStats[fieldKey] || { min: numVal, max: numVal, avg: 0, count: 0 };
+                      const newCount = prevNum.count + 1;
+                      const newMin = typeof prevNum.min === 'number' ? Math.min(prevNum.min, numVal) : numVal;
+                      const newMax = typeof prevNum.max === 'number' ? Math.max(prevNum.max, numVal) : numVal;
+                      const prevSum = typeof prevNum.avg === 'number' ? prevNum.avg * prevNum.count : 0;
+                      const newAvg = parseFloat(((prevSum + numVal) / newCount).toFixed(1));
+                      numericStats[fieldKey] = { min: newMin, max: newMax, avg: newAvg, count: newCount };
+
+                      // Stars
+                      const starRating = Math.round(numVal);
+                      if (starRating >= 1 && starRating <= 5) {
+                        if (!starCounts[fieldKey]) {
+                          starCounts[fieldKey] = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                        }
+                        starCounts[fieldKey][starRating] = (starCounts[fieldKey][starRating] || 0) + 1;
+
+                        let starSum = 0;
+                        let starTotal = 0;
+                        for (let r = 1; r <= 5; r++) {
+                          const c = starCounts[fieldKey][r] || 0;
+                          starSum += r * c;
+                          starTotal += c;
+                        }
+                        starAverages[fieldKey] = starTotal > 0 ? parseFloat((starSum / starTotal).toFixed(1)) : 0;
+                      }
+                    }
+
+                    // Text Commentary
+                    if (stringVal.length > 0) {
+                      if (!textResponses[fieldKey]) textResponses[fieldKey] = [];
+                      textResponses[fieldKey] = [
+                        { client: submission.client_identifier, text: stringVal, timestamp: new Date().toLocaleTimeString() },
+                        ...textResponses[fieldKey]
+                      ].slice(0, 100);
+                    }
+                  }
+
+                  dashboardStats = {
+                    ...dashboardStats,
+                    total: newTotal,
+                    syncPercentage: 100,
+                    starAverages,
+                    optionCounts,
+                    starCounts,
+                    numericStats,
+                    textResponses
+                  };
+                }
+              }
+
+              return {
+                history: updatedHistory,
+                submissionsLog: updatedLogs,
+                explorerSubmissions,
+                explorerTotalCount,
+                dashboardStats
+              };
+            });
           },
           error: () => {
-            // SseService handles reconnection; update badge if permanently closed
             patchState(store, { liveStreamActive: false });
             sseSubscription = null;
           },

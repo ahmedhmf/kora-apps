@@ -2143,3 +2143,177 @@ $aura-text-dark: #4a4a52;
 .animate-zoom {
   animation: zoomIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+// ─── Scalable Pagination & Glassmorphic Loader Styles ────────────────────────
+.explorer-relative-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.explorer-glass-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  border-radius: 12px;
+  animation: glass-overlay-fade-in 0.25s ease both;
+}
+
+@keyframes glass-overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.glass-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: $aura-gold;
+  animation: spin-sync 0.8s linear infinite;
+}
+
+.glass-spinner-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: $aura-gold-light;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.blur-content {
+  filter: blur(4px);
+  pointer-events: none;
+  transition: filter 0.3s ease;
+}
+
+.premium-pagination-bar {
+  margin-top: 2rem;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(8, 8, 8, 0.4);
+  border: 1px solid $aura-border-gold;
+  border-radius: 12px;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  gap: 1.5rem;
+  flex-wrap: wrap;
+
+  .pagination-info {
+    font-size: 0.8rem;
+    color: $aura-text-muted;
+    font-weight: 500;
+
+    .highlight-val {
+      color: $aura-gold;
+      font-weight: 700;
+    }
+  }
+
+  .pagination-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+
+    .btn-pager {
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: $aura-text-muted;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+      &:hover:not(:disabled) {
+        color: $aura-gold;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: $aura-border-gold-active;
+        transform: translateY(-1px);
+      }
+
+      &:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+      }
+
+      &.active {
+        color: $aura-black-bg;
+        background: $aura-gold;
+        border-color: $aura-gold;
+        font-weight: 700;
+        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+      }
+
+      &.step {
+        font-size: 1rem;
+      }
+    }
+  }
+
+  .pagination-size {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+
+    .size-label {
+      font-size: 0.8rem;
+      color: $aura-text-muted;
+      font-weight: 500;
+    }
+
+    .size-options {
+      display: flex;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      padding: 2px;
+
+      .btn-size-choice {
+        font-family: inherit;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: $aura-text-muted;
+        background: transparent;
+        border: none;
+        padding: 0.35rem 0.65rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+
+        &:hover:not(.active) {
+          color: $aura-gold;
+          background: rgba(255, 255, 255, 0.05);
+        }
+
+        &.active {
+          color: $aura-black-bg;
+          background: $aura-gold;
+          font-weight: 700;
+        }
+      }
+    }
+  }
+}
