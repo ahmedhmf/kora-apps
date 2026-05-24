@@ -13,6 +13,7 @@ import { broadcastHeartbeat } from './sse-bus';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy (needed for express-rate-limit behind Nginx)
 const PORT = parseInt(process.env.API_PORT || '3000', 10);
 
 // ─── Security Headers ─────────────────────────────────────────────────────────
